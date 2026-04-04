@@ -10,7 +10,7 @@ export async function getAIResponse(
   messages: { role: "user" | "assistant"; content: string }[]
 ) {
   const completion = await openai.chat.completions.create({
-    model: process.env.AI_MODEL ?? "meta-llama/llama-3.1-8b-instruct:free",
+    model: process.env.AI_MODEL ?? "openai/gpt-4o-mini",
     messages: [
       { role: "system" as const, content: SYSTEM_PROMPT },
       ...messages.map((m) => ({
