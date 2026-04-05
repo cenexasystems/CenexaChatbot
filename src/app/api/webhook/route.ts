@@ -1,7 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { getAIResponse } from "@/lib/ai";
+import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -106,22 +107,63 @@ export async function POST(request: NextRequest) {
 
     const history = (historyData || []).reverse();
 
-    // Get AI response
-    const aiResponse = await getAIResponse(
+    // Send fixed welcome message for first message
+    if (conversation.is_first_message) {
+      const welcomeMsg = `Hey! 👋 Welcome to Cenexa Systems — I'm Cera, your AI assistant.
+
+We help businesses grow with smart tech — WhatsApp bots, websites, custom software, and automation.
+
+What can I help you with today? 😊`;
+
+      await sendWhatsAppMessage(phone, welcomeMsg);
+
+      await supabase.from("conversations").update({
+        is_first_message: false,
+        msg_count_hour: 1,
+        msg_count_day: 1,
+        msg_count_month: 1,
+      }).eq("id", conversation.id);
+
+      // Store AI (welcome) response
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: welcomeMsg,
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Check rate limits
+    const limit = await checkAndUpdateRateLimit(conversation.id, conversation);
+    if (!limit.allowed) {
+      await sendWhatsAppMessage(phone, limit.message!);
+      return NextResponse.json({ success: true });
+    }
+
+    // Call AI with full error handling
+    const { reply, error } = await getAIResponse(
       (history || []).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       }))
     );
 
-    // Send response via WhatsApp
-    await sendWhatsAppMessage(phone, aiResponse);
+    // If AI failed — switch to human mode automatically
+    if (error) {
+      await supabase.from("conversations").update({
+        mode: "human"
+      }).eq("id", conversation.id);
+    }
+
+    // Always send a reply — either AI or fallback
+    await sendWhatsAppMessage(phone, reply);
 
     // Store AI response
     await supabase.from("messages").insert({
       conversation_id: conversation.id,
       role: "assistant",
-      content: aiResponse,
+      content: reply,
     });
 
     // Update conversation timestamp again
