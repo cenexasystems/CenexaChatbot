@@ -35,7 +35,17 @@ export default function Dashboard() {
   const fetchConversations = useCallback(async () => {
     try {
       const res = await fetch("/api/conversations");
-      const data = await res.json();
+      
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Handle case where response is not valid JSON (e.g., empty 500)
+        setFetchError(`API crashed: HTTP ${res.status} ${res.statusText}`);
+        setConversations([]);
+        return;
+      }
+
       if (!res.ok || data?.error) {
         setFetchError(data?.error ?? `HTTP ${res.status}`);
         setConversations([]);
