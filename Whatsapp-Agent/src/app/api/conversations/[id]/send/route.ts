@@ -14,10 +14,10 @@ export async function POST(
     return Response.json({ error: "Message is required" }, { status: 400 });
   }
 
-  // Get conversation to find phone number
+  // Get conversation + business credentials
   const { data: conversation, error: convoError } = await supabase
     .from("conversations")
-    .select("phone")
+    .select("phone, business_id")
     .eq("id", id)
     .single();
 
@@ -25,8 +25,25 @@ export async function POST(
     return Response.json({ error: "Conversation not found" }, { status: 404 });
   }
 
-  // Send via WhatsApp
-  await sendWhatsAppMessage(conversation.phone, message);
+  // Fetch business credentials if linked
+  let phoneNumberId: string | undefined;
+  let accessToken: string | undefined;
+
+  if (conversation.business_id) {
+    const { data: biz } = await supabase
+      .from("businesses")
+      .select("phone_number_id, access_token")
+      .eq("id", conversation.business_id)
+      .single();
+
+    if (biz) {
+      phoneNumberId = biz.phone_number_id;
+      accessToken = biz.access_token;
+    }
+  }
+
+  // Send via WhatsApp using business credentials
+  await sendWhatsAppMessage(conversation.phone, message, { phoneNumberId, accessToken });
 
   // Store in DB
   const { data: msg, error: msgError } = await supabase
