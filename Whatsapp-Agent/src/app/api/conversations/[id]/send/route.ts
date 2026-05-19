@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export async function POST(
@@ -13,6 +13,8 @@ export async function POST(
   if (!message?.trim()) {
     return Response.json({ error: "Message is required" }, { status: 400 });
   }
+
+  const supabase = await createClient();
 
   // Get conversation + business credentials
   const { data: conversation, error: convoError } = await supabase

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import type { ConversationWithLastMessage, Message } from "@/lib/types";
+import { logout } from "./login/actions";
 
 const PAYMENT_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   none: { label: "No Payment", color: "text-white/30", bg: "bg-white/5" },
@@ -12,13 +13,9 @@ const PAYMENT_LABELS: Record<string, { label: string; color: string; bg: string 
 };
 
 export default function Dashboard() {
-  const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
-  }, []);
+  const supabase = useMemo(() => createClient(), []);
 
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -29,6 +26,12 @@ export default function Dashboard() {
   const [savingNote, setSavingNote] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserEmail(user.email ?? null);
+    });
+  }, [supabase]);
 
   const selected = conversations.find((c) => c.id === selectedId);
 
@@ -238,7 +241,7 @@ export default function Dashboard() {
       {/* Sidebar */}
       <div className="w-[320px] flex flex-col border-r border-white/[0.06]" style={{ background: "#141414" }}>
         {/* Sidebar Header */}
-        <div className="px-5 py-4 border-b border-white/[0.06]">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -247,9 +250,22 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="text-sm font-semibold text-white leading-tight">WhatsApp AI Agent</h1>
-              <p className="text-xs text-white/40 leading-tight mt-0.5">{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
+              <p className="text-xs text-white/40 leading-tight mt-0.5" title={userEmail || ""}>
+                {userEmail ? (userEmail.length > 20 ? userEmail.substring(0, 17) + "..." : userEmail) : `${conversations.length} conversation${conversations.length !== 1 ? "s" : ""}`}
+              </p>
             </div>
           </div>
+          <button
+            onClick={() => logout()}
+            title="Log Out"
+            className="w-8 h-8 rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
         </div>
 
         {/* Conversation List */}

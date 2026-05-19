@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function PATCH(
   request: NextRequest,
@@ -29,6 +29,8 @@ export async function PATCH(
   if (Object.keys(update).length === 0) {
     return Response.json({ error: "No valid fields to update" }, { status: 400 });
   }
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("conversations")

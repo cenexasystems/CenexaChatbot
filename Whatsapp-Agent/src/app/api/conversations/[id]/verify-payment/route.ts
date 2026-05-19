@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
   request: NextRequest,
@@ -19,6 +19,8 @@ export async function POST(
 
   const update: Record<string, unknown> = { payment_status: status };
   if (note !== undefined) update.internal_note = note;
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("conversations")

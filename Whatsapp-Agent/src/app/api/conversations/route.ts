@@ -1,8 +1,8 @@
-import { getSupabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     const { data: conversations, error } = await supabase
       .from("conversations")
