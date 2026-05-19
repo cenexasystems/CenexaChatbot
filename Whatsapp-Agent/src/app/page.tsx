@@ -4,6 +4,13 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { ConversationWithLastMessage, Message } from "@/lib/types";
 
+const PAYMENT_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  none: { label: "No Payment", color: "text-white/30", bg: "bg-white/5" },
+  pending: { label: "⏳ Pending", color: "text-yellow-400", bg: "bg-yellow-500/15" },
+  verified: { label: "✅ Verified", color: "text-emerald-400", bg: "bg-emerald-500/15" },
+  rejected: { label: "❌ Rejected", color: "text-red-400", bg: "bg-red-500/15" },
+};
+
 export default function Dashboard() {
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -17,6 +24,9 @@ export default function Dashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [noteInput, setNoteInput] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const selected = conversations.find((c) => c.id === selectedId);
@@ -38,7 +48,13 @@ export default function Dashboard() {
   }, [fetchConversations]);
 
   useEffect(() => {
-    if (selectedId) fetchMessages(selectedId);
+    if (selectedId) {
+      fetchMessages(selectedId);
+      // Sync note from selected conversation
+      const convo = conversations.find((c) => c.id === selectedId);
+      setNoteInput(convo?.internal_note ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, fetchMessages]);
 
   useEffect(() => {
@@ -88,6 +104,38 @@ export default function Dashboard() {
     );
   }
 
+  async function setPaymentStatus(status: string) {
+    if (!selected) return;
+    await fetch(`/api/conversations/${selected.id}/verify-payment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selected.id
+          ? { ...c, payment_status: status as ConversationWithLastMessage["payment_status"] }
+          : c
+      )
+    );
+  }
+
+  async function saveNote() {
+    if (!selected) return;
+    setSavingNote(true);
+    await fetch(`/api/conversations/${selected.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internal_note: noteInput }),
+    });
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selected.id ? { ...c, internal_note: noteInput } : c
+      )
+    );
+    setSavingNote(false);
+  }
+
   async function handleSend() {
     if (!input.trim() || !selectedId || sending) return;
     setSending(true);
@@ -108,6 +156,60 @@ export default function Dashboard() {
   function getInitials(name: string | null, phone: string) {
     if (name) return name.slice(0, 2).toUpperCase();
     return phone.slice(-2);
+  }
+
+  function renderMessageContent(msg: Message) {
+    if (msg.media_url) {
+      if (msg.media_type === "image") {
+        return (
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => setLightboxUrl(msg.media_url)}
+              className="rounded-xl overflow-hidden border border-white/10 hover:opacity-90 transition-opacity"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={msg.media_url} alt="image" className="max-w-[220px] max-h-[220px] object-cover" />
+            </button>
+            {msg.is_payment_screenshot && (
+              <span className="text-[9px] text-yellow-400/70 font-medium uppercase tracking-wide">
+                💳 Payment screenshot
+              </span>
+            )}
+            {msg.content && !msg.content.startsWith("[") && (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+            )}
+          </div>
+        );
+      }
+      if (msg.media_type === "audio") {
+        return (
+          <div className="flex flex-col gap-1">
+            <audio controls src={msg.media_url} className="max-w-[220px] h-9" />
+            {msg.content && !msg.content.startsWith("[") && (
+              <p className="text-xs text-white/60">{msg.content}</p>
+            )}
+          </div>
+        );
+      }
+      if (msg.media_type === "document") {
+        return (
+          <a
+            href={msg.media_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2"
+          >
+            📄 {msg.content && !msg.content.startsWith("[") ? msg.content : "Document"}
+          </a>
+        );
+      }
+      if (msg.media_type === "video") {
+        return (
+          <video controls src={msg.media_url} className="max-w-[220px] rounded-xl border border-white/10" />
+        );
+      }
+    }
+    return <p className="whitespace-pre-wrap">{msg.content}</p>;
   }
 
   return (
@@ -143,6 +245,7 @@ export default function Dashboard() {
           )}
           {conversations.map((convo) => {
             const isSelected = selectedId === convo.id;
+            const payment = PAYMENT_LABELS[convo.payment_status ?? "none"];
             return (
               <button
                 key={convo.id}
@@ -174,15 +277,22 @@ export default function Dashboard() {
                       ) : (
                         <span />
                       )}
-                      <span
-                        className={`text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 uppercase tracking-wide ${
-                          convo.mode === "agent"
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-amber-500/20 text-amber-400"
-                        }`}
-                      >
-                        {convo.mode === "agent" ? "AI" : "You"}
-                      </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {convo.payment_status && convo.payment_status !== "none" && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${payment.bg} ${payment.color}`}>
+                            {convo.payment_status}
+                          </span>
+                        )}
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${
+                            convo.mode === "agent"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "bg-amber-500/20 text-amber-400"
+                          }`}
+                        >
+                          {convo.mode === "agent" ? "AI" : "You"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -209,7 +319,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Chat Header */}
-            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between" style={{ background: "#141414" }}>
+            <div className="px-6 py-3.5 border-b border-white/[0.06] flex items-center justify-between gap-4 flex-wrap" style={{ background: "#141414" }}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white text-xs font-semibold">
                   {getInitials(selected.name, selected.phone)}
@@ -221,24 +331,71 @@ export default function Dashboard() {
                   <p className="text-xs text-white/40 leading-tight mt-0.5">{selected.phone}</p>
                 </div>
               </div>
-              <button
-                onClick={toggleMode}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                  selected.mode === "agent"
-                    ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20"
-                    : "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/20"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${selected.mode === "agent" ? "bg-emerald-400" : "bg-amber-400"}`} />
-                {selected.mode === "agent" ? "AI Mode" : "Human Mode"}
-              </button>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Payment status controls */}
+                <div className="flex items-center gap-1 border border-white/[0.08] rounded-lg p-0.5">
+                  {(["none", "pending", "verified", "rejected"] as const).map((s) => {
+                    const p = PAYMENT_LABELS[s];
+                    const isActive = selected.payment_status === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setPaymentStatus(s)}
+                        title={p.label}
+                        className={`text-[9px] px-2 py-1 rounded font-medium uppercase tracking-wide transition-all ${
+                          isActive ? `${p.bg} ${p.color}` : "text-white/30 hover:text-white/60"
+                        }`}
+                      >
+                        {s === "none" ? "Pay?" : s}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Mode toggle */}
+                <button
+                  onClick={toggleMode}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    selected.mode === "agent"
+                      ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20"
+                      : "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/20"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${selected.mode === "agent" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                  {selected.mode === "agent" ? "AI Mode" : "Human Mode"}
+                </button>
+              </div>
+            </div>
+
+            {/* Internal Note Bar */}
+            <div className="px-6 py-2.5 border-b border-white/[0.04] flex items-center gap-2" style={{ background: "#131313" }}>
+              <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium flex-shrink-0">Note</span>
+              <input
+                type="text"
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveNote()}
+                placeholder="Internal note (not sent to customer)…"
+                className="flex-1 bg-transparent text-xs text-white/60 placeholder:text-white/20 focus:outline-none"
+              />
+              {noteInput !== (selected.internal_note ?? "") && (
+                <button
+                  onClick={saveNote}
+                  disabled={savingNote}
+                  className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-40"
+                >
+                  {savingNote ? "Saving…" : "Save"}
+                </button>
+              )}
             </div>
 
             {/* Messages */}
             <div
               className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
               style={{
-                backgroundImage: "radial-gradient(circle at 20% 80%, rgba(16,185,129,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(16,185,129,0.02) 0%, transparent 50%)",
+                backgroundImage:
+                  "radial-gradient(circle at 20% 80%, rgba(16,185,129,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(16,185,129,0.02) 0%, transparent 50%)",
               }}
             >
               {messages.map((msg, i) => {
@@ -257,7 +414,7 @@ export default function Dashboard() {
                             : "bg-emerald-600 text-white rounded-tr-sm"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        {renderMessageContent(msg)}
                       </div>
                       {showTime && (
                         <p className="text-[10px] text-white/25 mt-1.5 px-1">
@@ -280,7 +437,7 @@ export default function Dashboard() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                  placeholder="Type a message..."
+                  placeholder="Type a message…"
                   className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25 focus:outline-none"
                 />
                 <button
@@ -305,6 +462,29 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Image Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
+          onClick={() => setLightboxUrl(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            className="max-w-[90vw] max-h-[90vh] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
