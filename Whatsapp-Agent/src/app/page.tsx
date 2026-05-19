@@ -20,6 +20,7 @@ export default function Dashboard() {
   }, []);
 
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -32,9 +33,19 @@ export default function Dashboard() {
   const selected = conversations.find((c) => c.id === selectedId);
 
   const fetchConversations = useCallback(async () => {
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    setConversations(data);
+    try {
+      const res = await fetch("/api/conversations");
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        setFetchError(data?.error ?? `HTTP ${res.status}`);
+        setConversations([]);
+      } else {
+        setFetchError(null);
+        setConversations(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : "Network error");
+    }
   }, []);
 
   const fetchMessages = useCallback(async (convoId: string) => {
@@ -233,7 +244,13 @@ export default function Dashboard() {
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto">
-          {conversations.length === 0 && (
+          {fetchError && (
+            <div className="mx-4 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <p className="text-[10px] text-red-400 font-medium uppercase tracking-wide mb-1">API Error</p>
+              <p className="text-xs text-red-300/80 break-all">{fetchError}</p>
+            </div>
+          )}
+          {!fetchError && conversations.length === 0 && (
             <div className="flex flex-col items-center justify-center h-48 gap-2">
               <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
