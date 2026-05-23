@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'chat'>('list');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -239,7 +240,7 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#0f0f0f] font-sans">
       {/* Sidebar */}
-      <div className="w-[320px] flex flex-col border-r border-white/[0.06]" style={{ background: "#141414" }}>
+      <div className={`w-full md:w-[320px] md:min-w-[320px] flex-col border-r border-white/[0.06] ${view === 'chat' ? 'hidden md:flex' : 'flex'}`} style={{ background: "#141414" }}>
         {/* Sidebar Header */}
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -258,7 +259,7 @@ export default function Dashboard() {
           <button
             onClick={() => logout()}
             title="Log Out"
-            className="w-8 h-8 rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+            className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -292,8 +293,8 @@ export default function Dashboard() {
             return (
               <button
                 key={convo.id}
-                onClick={() => setSelectedId(convo.id)}
-                className={`w-full text-left px-4 py-3.5 transition-all duration-150 relative group ${
+                onClick={() => { setSelectedId(convo.id); setView('chat'); }}
+                className={`w-full text-left px-4 py-3.5 min-h-[64px] transition-all duration-150 relative group ${
                   isSelected ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
                 }`}
               >
@@ -346,7 +347,7 @@ export default function Dashboard() {
       </div>
 
       {/* Chat Panel */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex-col min-w-0 ${view === 'list' ? 'hidden md:flex' : 'flex'}`}>
         {!selected ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
@@ -362,8 +363,16 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Chat Header */}
-            <div className="px-6 py-3.5 border-b border-white/[0.06] flex items-center justify-between gap-4 flex-wrap" style={{ background: "#141414" }}>
+            <div className="px-4 md:px-6 py-3.5 border-b border-white/[0.06] flex items-center justify-between gap-4 flex-wrap" style={{ background: "#141414" }}>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => { setView('list'); setSelectedId(null); }}
+                  className="md:hidden p-2 -ml-1 rounded-lg text-white/60 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white text-xs font-semibold">
                   {getInitials(selected.name, selected.phone)}
                 </div>
@@ -386,7 +395,7 @@ export default function Dashboard() {
                         key={s}
                         onClick={() => setPaymentStatus(s)}
                         title={p.label}
-                        className={`text-[9px] px-2 py-1 rounded font-medium uppercase tracking-wide transition-all ${
+                        className={`text-[9px] px-2 min-h-[44px] md:min-h-0 py-1 rounded font-medium uppercase tracking-wide transition-all flex items-center justify-center ${
                           isActive ? `${p.bg} ${p.color}` : "text-white/30 hover:text-white/60"
                         }`}
                       >
@@ -399,7 +408,7 @@ export default function Dashboard() {
                 {/* Mode toggle */}
                 <button
                   onClick={toggleMode}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3 min-h-[44px] md:min-h-0 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                     selected.mode === "agent"
                       ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20"
                       : "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/20"
@@ -412,7 +421,7 @@ export default function Dashboard() {
             </div>
 
             {/* Internal Note Bar */}
-            <div className="px-6 py-2.5 border-b border-white/[0.04] flex items-center gap-2" style={{ background: "#131313" }}>
+            <div className="px-4 md:px-6 py-2.5 border-b border-white/[0.04] flex items-center gap-2" style={{ background: "#131313" }}>
               <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium flex-shrink-0">Note</span>
               <input
                 type="text"
@@ -420,13 +429,13 @@ export default function Dashboard() {
                 onChange={(e) => setNoteInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && saveNote()}
                 placeholder="Internal note (not sent to customer)…"
-                className="flex-1 bg-transparent text-xs text-white/60 placeholder:text-white/20 focus:outline-none"
+                className="flex-1 bg-transparent text-[16px] md:text-xs text-white/60 placeholder:text-white/20 focus:outline-none"
               />
               {noteInput !== (selected.internal_note ?? "") && (
                 <button
                   onClick={saveNote}
                   disabled={savingNote}
-                  className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-40"
+                  className="text-[10px] px-3 min-h-[44px] md:min-h-0 py-0.5 rounded bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-40"
                 >
                   {savingNote ? "Saving…" : "Save"}
                 </button>
@@ -435,7 +444,7 @@ export default function Dashboard() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+              className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-4"
               style={{
                 backgroundImage:
                   "radial-gradient(circle at 20% 80%, rgba(16,185,129,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(16,185,129,0.02) 0%, transparent 50%)",
@@ -449,7 +458,7 @@ export default function Dashboard() {
                     key={msg.id}
                     className={`flex ${isUser ? "justify-start" : "justify-end"}`}
                   >
-                    <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[65%]`}>
+                    <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%]`}>
                       <div
                         className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           isUser
@@ -473,20 +482,20 @@ export default function Dashboard() {
             </div>
 
             {/* Input Bar */}
-            <div className="px-6 py-4 border-t border-white/[0.06]" style={{ background: "#141414" }}>
-              <div className="flex items-center gap-3 bg-white/[0.06] rounded-xl px-4 py-2.5 border border-white/[0.06] focus-within:border-emerald-500/40 transition-colors">
+            <div className="px-4 md:px-6 pt-4" style={{ background: "#141414", paddingBottom: "max(1rem, env(safe-area-inset-bottom))", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="flex items-center gap-3 bg-white/[0.06] rounded-xl px-4 py-2 border border-white/[0.06] focus-within:border-emerald-500/40 transition-colors">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                   placeholder="Type a message…"
-                  className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25 focus:outline-none"
+                  className="flex-1 bg-transparent text-[16px] md:text-sm text-white/90 placeholder:text-white/25 focus:outline-none py-1"
                 />
                 <button
                   onClick={handleSend}
                   disabled={sending || !input.trim()}
-                  className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 flex items-center justify-center flex-shrink-0"
+                  className="w-[44px] h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 flex items-center justify-center flex-shrink-0"
                   aria-label="Send"
                 >
                   {sending ? (
@@ -521,7 +530,7 @@ export default function Dashboard() {
           />
           <button
             onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            className="absolute top-4 right-4 w-[44px] h-[44px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
             aria-label="Close"
           >
             ✕
