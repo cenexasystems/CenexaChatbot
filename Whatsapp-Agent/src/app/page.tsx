@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [savingNote, setSavingNote] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'chat'>('list');
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,6 +37,17 @@ export default function Dashboard() {
   }, [supabase]);
 
   const selected = conversations.find((c) => c.id === selectedId);
+
+  const filteredConvos = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const query = searchQuery.toLowerCase();
+    return conversations.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(query)) ||
+        (c.phone && c.phone.toLowerCase().includes(query)) ||
+        (c.last_message && c.last_message.toLowerCase().includes(query))
+    );
+  }, [conversations, searchQuery]);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -242,31 +255,80 @@ export default function Dashboard() {
       {/* Sidebar */}
       <div className={`w-full md:w-[320px] md:min-w-[320px] flex-col border-r border-white/[0.06] ${view === 'chat' ? 'hidden md:flex' : 'flex'}`} style={{ background: "#141414" }}>
         {/* Sidebar Header */}
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
+        <div className="px-5 py-4 border-b border-white/[0.06] h-[76px] flex items-center">
+          {!showSearch ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-sm font-semibold text-white leading-tight">WhatsApp AI Agent</h1>
+                  <p className="text-xs text-white/40 leading-tight mt-0.5" title={userEmail || ""}>
+                    {userEmail ? (userEmail.length > 20 ? userEmail.substring(0, 17) + "..." : userEmail) : `${conversations.length} conversation${conversations.length !== 1 ? "s" : ""}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowSearch(true)}
+                  title="Search"
+                  className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => logout()}
+                  title="Log Out"
+                  className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div>
-              <h1 className="text-sm font-semibold text-white leading-tight">WhatsApp AI Agent</h1>
-              <p className="text-xs text-white/40 leading-tight mt-0.5" title={userEmail || ""}>
-                {userEmail ? (userEmail.length > 20 ? userEmail.substring(0, 17) + "..." : userEmail) : `${conversations.length} conversation${conversations.length !== 1 ? "s" : ""}`}
-              </p>
+          ) : (
+            <div className="flex items-center w-full gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
+              <button
+                onClick={() => { setShowSearch(false); setSearchQuery(""); }}
+                className="w-[44px] h-[44px] -ml-2 flex-shrink-0 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+              </button>
+              <div className="flex-1 flex items-center bg-white/[0.05] border border-white/[0.06] focus-within:border-emerald-500/40 rounded-xl px-3 transition-colors h-[40px]">
+                <input
+                  type="text"
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name or number..."
+                  className="w-full bg-transparent text-[16px] md:text-sm text-white/90 placeholder:text-white/30 focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-          <button
-            onClick={() => logout()}
-            title="Log Out"
-            className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
+          )}
         </div>
 
         {/* Conversation List */}
@@ -287,7 +349,12 @@ export default function Dashboard() {
               <p className="text-xs text-white/30">No conversations yet</p>
             </div>
           )}
-          {conversations.map((convo) => {
+          {!fetchError && conversations.length > 0 && filteredConvos.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-48 gap-2">
+              <p className="text-xs text-white/30">No matching conversations found</p>
+            </div>
+          )}
+          {filteredConvos.map((convo) => {
             const isSelected = selectedId === convo.id;
             const payment = PAYMENT_LABELS[convo.payment_status ?? "none"];
             return (
