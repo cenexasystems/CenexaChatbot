@@ -1,10 +1,28 @@
-import { supabase } from "@/lib/supabase";
+import { NextRequest } from "next/server";
+import { getSupabase } from "@/lib/supabase";
 
-export async function GET() {
-  const { data: conversations, error } = await supabase
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const businessId = searchParams.get("business_id");
+
+  // Safety: never return all conversations without a business_id filter
+  if (!businessId) {
+    return Response.json([]);
+  }
+
+  const supabase = getSupabase();
+
+  let query = supabase
     .from("conversations")
     .select("*")
     .order("updated_at", { ascending: false });
+
+  // Filter by business_id if provided
+  if (businessId) {
+    query = query.eq("business_id", businessId);
+  }
+
+  const { data: conversations, error } = await query;
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -21,24 +39,10 @@ export async function GET() {
         .limit(1);
 
       const lastMsg = messages?.[0];
-      let displayText = lastMsg?.content || null;
-
-      // If it's a media-only message, show a friendly label
-      if (lastMsg?.media_type && (!lastMsg.content || lastMsg.content.startsWith("["))) {
-        const labels: Record<string, string> = {
-          image: "📷 Image",
-          audio: "🎵 Audio",
-          video: "🎥 Video",
-          document: "📄 Document",
-          sticker: "🩹 Sticker",
-        };
-        displayText = labels[lastMsg.media_type] ?? lastMsg.content;
-      }
-
       return {
         ...convo,
-        last_message: displayText,
-        last_message_type: lastMsg?.media_type ?? null,
+        last_message: lastMsg?.content || null,
+        last_message_type: lastMsg?.media_type || null,
       };
     })
   );
