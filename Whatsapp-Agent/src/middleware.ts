@@ -42,15 +42,22 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // If user is NOT logged in and trying to access a protected route, redirect to login
-  if (!user && pathname !== "/login") {
+  const isPublicRoute = pathname === "/home" || pathname === "/login";
+
+  // If user is NOT logged in and trying to access a protected route, redirect
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    // If they hit the root dashboard without logging in, send them to the landing page
+    if (pathname === "/") {
+      url.pathname = "/home";
+    } else {
+      url.pathname = "/login";
+    }
     return NextResponse.redirect(url);
   }
 
-  // If user IS logged in and tries to access login, redirect to dashboard
-  if (user && pathname === "/login") {
+  // If user IS logged in and tries to access login or landing page, redirect to dashboard
+  if (user && (pathname === "/login" || pathname === "/home")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
