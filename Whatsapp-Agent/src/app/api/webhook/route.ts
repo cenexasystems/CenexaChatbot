@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
         // Auto-flag images as potential payment screenshots
         if (mediaType === "image") {
           isPaymentScreenshot = true;
-          // Update payment_status to pending if it's currently 'none'
-          if (conversation.payment_status === "none") {
+          // ALWAYS update payment_status to pending for new images
+          if (conversation.payment_status !== "pending") {
             await supabase
               .from("conversations")
               .update({ payment_status: "pending" })
@@ -170,9 +170,10 @@ export async function POST(request: NextRequest) {
 
     // Send fixed welcome message for first message
     if (conversation.is_first_message) {
+      // Use the client's custom message, or a generic fallback for new clients
       const welcomeMsg =
         businessWelcomeMessage ??
-        `Hey! 👋 Welcome to Cenexa Systems — I'm Cera, your AI assistant.\n\nWe help businesses grow with smart tech — WhatsApp bots, websites, custom software, and automation.\n\nWhat can I help you with today? 😊`;
+        `Hey! 👋 I'm your AI assistant. How can I help you today? 😊`;
 
       await sendWhatsAppMessage(phone, welcomeMsg, {
         phoneNumberId: incomingPhoneNumberId,
