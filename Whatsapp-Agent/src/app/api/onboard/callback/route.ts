@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     tokenUrl.searchParams.set("code", code);
     // The redirect_uri must match what's registered in the Meta app dashboard.
     // For Embedded Signup with response_type=code, Meta requires this exact value.
-    tokenUrl.searchParams.set("redirect_uri", `${appUrl}/onboard`);
+    
 
     const tokenRes = await fetch(tokenUrl.toString());
     const tokenData = await tokenRes.json();
