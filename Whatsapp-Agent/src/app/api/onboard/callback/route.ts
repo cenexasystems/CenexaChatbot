@@ -4,16 +4,6 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 /**
  * POST /api/onboard/callback
- *
- * Called from the frontend after the Facebook Embedded Signup popup
- * returns an authorization code.
- *
- * Steps:
- *  1. Exchange the short-lived code for an access token
- *  2. Fetch the user's WhatsApp Business Accounts (WABA)
- *  3. Fetch phone number IDs linked to the WABA
- *  4. Register the phone number with the Cloud API
- *  5. Save a new row in `businesses` + link the auth user in `profiles`
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,7 +30,6 @@ export async function POST(request: NextRequest) {
     // ── 2. Exchange code for access token ──────────────────────────────────
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     if (!appId || !appSecret) {
       return NextResponse.json(
@@ -53,9 +42,7 @@ export async function POST(request: NextRequest) {
     tokenUrl.searchParams.set("client_id", appId);
     tokenUrl.searchParams.set("client_secret", appSecret);
     tokenUrl.searchParams.set("code", code);
-    // The redirect_uri must match what's registered in the Meta app dashboard.
-    // For Embedded Signup with response_type=code, Meta requires this exact value.
-    
+    // FB.login() JS SDK flow: redirect_uri MUST NOT be included.
 
     const tokenRes = await fetch(tokenUrl.toString());
     const tokenData = await tokenRes.json();
@@ -70,33 +57,57 @@ export async function POST(request: NextRequest) {
 
     const accessToken: string = tokenData.access_token;
 
-    // ── 3. Fetch the user's WhatsApp Business Accounts ────────────────────
-    const wabaRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/businesses?fields=id,name,owned_whatsapp_business_accounts{id,name,phone_numbers{id,display_phone_number,verified_name}}&access_token=${accessToken}`
-    );
-    const wabaData = await wabaRes.json();
+    // ── 3. Find WABA ID via debug_token endpoint ──────────────────────────
+    const debugUrl = `https://graph.facebook.com/v19.0/debug_token?input_token=${accessToken}&access_token=${appId}|${appSecret}`;
+    const debugRes = await fetch(debugUrl);
+    const debugData = await debugRes.json();
 
-    if (!wabaRes.ok || wabaData.error) {
-      console.error("[onboard/callback] WABA fetch failed:", wabaData);
+    if (!debugRes.ok || debugData.error || !debugData.data) {
+      console.error("[onboard/callback] Debug token failed:", debugData);
       return NextResponse.json(
-        { error: wabaData?.error?.message ?? "Failed to fetch WhatsApp Business Accounts" },
+        { error: debugData?.error?.message ?? "Failed to validate token permissions" },
         { status: 400 }
       );
     }
 
-    // Find the first available phone number across all businesses/WABAs
+    let wabaId: string | null = null;
+    const granularScopes = debugData.data.granular_scopes ?? [];
+
+    for (const scope of granularScopes) {
+      if (scope.scope === "whatsapp_business_management" && scope.target_ids && scope.target_ids.length > 0) {
+        wabaId = scope.target_ids[0];
+        break;
+      }
+    }
+
+    if (!wabaId) {
+      return NextResponse.json(
+        { error: "No WhatsApp Business Account found in the token scopes. Did you complete the signup?" },
+        { status: 400 }
+      );
+    }
+
+    // ── 4. Fetch the phone numbers for this specific WABA ─────────────────
+    const wabaPhonesRes = await fetch(
+      `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+    );
+    const wabaPhonesData = await wabaPhonesRes.json();
+
+    if (!wabaPhonesRes.ok || wabaPhonesData.error) {
+      console.error("[onboard/callback] WABA phone numbers fetch failed:", wabaPhonesData);
+      return NextResponse.json(
+        { error: wabaPhonesData?.error?.message ?? "Failed to fetch phone numbers for the account" },
+        { status: 400 }
+      );
+    }
+
     let phoneNumberId: string | null = null;
     let whatsappNumber: string | null = null;
-
-    outer: for (const biz of wabaData.data ?? []) {
-      for (const waba of biz.owned_whatsapp_business_accounts?.data ?? []) {
-        const phone = waba.phone_numbers?.data?.[0];
-        if (phone?.id) {
-          phoneNumberId = phone.id;
-          whatsappNumber = phone.display_phone_number ?? null;
-          break outer;
-        }
-      }
+    
+    const phone = wabaPhonesData.data?.[0];
+    if (phone?.id) {
+      phoneNumberId = phone.id;
+      whatsappNumber = phone.display_phone_number ?? null;
     }
 
     if (!phoneNumberId) {
@@ -109,9 +120,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 4. Register the phone number with the Cloud API ───────────────────
-    // This is required if the number was previously on WhatsApp Business App.
-    // It's a no-op if already registered — safe to always call.
+    // ── 5. Register the phone number with the Cloud API ───────────────────
     try {
       await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/register`, {
         method: "POST",
@@ -121,21 +130,19 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          pin: "000000", // Default PIN — client can change later in Meta dashboard
+          pin: "000000",
         }),
       });
     } catch (regErr) {
-      // Non-fatal: log and continue. The number may already be registered.
       console.warn("[onboard/callback] Register step warning:", regErr);
     }
 
-    // ── 5. Write to Supabase using the service role (bypasses RLS) ─────────
+    // ── 6. Write to Supabase using the service role (bypasses RLS) ────────
     const adminClient = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Check if this phone_number_id is already registered
     const { data: existingBusiness } = await adminClient
       .from("businesses")
       .select("id")
@@ -145,14 +152,12 @@ export async function POST(request: NextRequest) {
     let businessId: string;
 
     if (existingBusiness) {
-      // Business already exists — update the access token (token refresh scenario)
       businessId = existingBusiness.id;
       await adminClient
         .from("businesses")
         .update({ access_token: accessToken, is_active: true, name: businessName.trim() })
         .eq("id", businessId);
     } else {
-      // Insert new business record
       const { data: newBusiness, error: insertError } = await adminClient
         .from("businesses")
         .insert({
@@ -177,7 +182,6 @@ export async function POST(request: NextRequest) {
       businessId = newBusiness.id;
     }
 
-    // Upsert the profile — link the auth user to this business as admin
     const { error: profileError } = await adminClient.from("profiles").upsert(
       {
         id: user.id,
