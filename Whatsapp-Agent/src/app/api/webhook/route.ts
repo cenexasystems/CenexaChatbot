@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { getAIResponse } from "@/lib/ai";
 import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia, getMediaCategory } from "@/lib/media";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabase = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
