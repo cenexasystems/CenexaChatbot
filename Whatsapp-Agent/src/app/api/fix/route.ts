@@ -31,7 +31,25 @@ export async function GET() {
           headers: { Authorization: `Bearer ${biz.access_token}` }
         });
         const subData = await subRes.json();
-        results.push({ wabaId, subData });
+        
+        // Fetch phone numbers to fix phone_number_id in database
+        const phoneRes = await fetch(`https://graph.facebook.com/v19.0/${wabaId}/phone_numbers`, {
+          headers: { Authorization: `Bearer ${biz.access_token}` }
+        });
+        const phoneData = await phoneRes.json();
+        
+        let phoneNumberId = null;
+        if (phoneData.data && phoneData.data.length > 0) {
+          phoneNumberId = phoneData.data[0].id;
+          
+          // Update database with correct phone number ID
+          await supabase.from("businesses").update({ 
+            phone_number_id: phoneNumberId,
+            waba_id: wabaId
+          }).eq("id", biz.id);
+        }
+
+        results.push({ wabaId, phoneNumberId, subData });
       }
     }
   }
