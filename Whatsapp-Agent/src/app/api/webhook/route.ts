@@ -120,16 +120,18 @@ export async function POST(request: NextRequest) {
       if (stored) {
         mediaUrl = stored.publicUrl;
         mediaType = stored.mediaType;
-        // Auto-flag images as potential payment screenshots
+        // SMART PAYMENT DETECTION:
+        // Only flag as payment screenshot if our team sent a QR code first
         if (mediaType === "image") {
-          isPaymentScreenshot = true;
-          // ALWAYS update payment_status to pending for new images
-          if (conversation.payment_status !== "pending") {
+          if (conversation.payment_qr_sent) {
+            isPaymentScreenshot = true;
+            // Reset QR flag and mark payment as pending for team verification
             await supabase
               .from("conversations")
-              .update({ payment_status: "pending" })
+              .update({ payment_status: "pending", payment_qr_sent: false })
               .eq("id", conversation.id);
           }
+          // If no QR was sent → treat as a regular image, no payment flag
         }
       }
     } else if (mediaId && !businessAccessToken) {
@@ -255,3 +257,4 @@ export async function POST(request: NextRequest) {
     return Response.json({ status: "error" }, { status: 500 });
   }
 }
+
