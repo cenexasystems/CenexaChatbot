@@ -41,8 +41,12 @@ export default function Dashboard() {
   const [showDetails, setShowDetails] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [view, setView] = useState<"list" | "chat">("list");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [sendingImage, setSendingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
  
   const selected = conversations.find((c) => c.id === selectedId);
  
@@ -57,41 +61,24 @@ export default function Dashboard() {
     );
   }, [conversations, search]);
  
-  // ── Auth check on mount ──
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/login");
-        return;
-      }
+      if (!session) { router.push("/login"); return; }
       setAuthToken(session.access_token);
     });
- 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.push("/login");
-        return;
-      }
+      if (!session) { router.push("/login"); return; }
       setAuthToken(session.access_token);
     });
- 
     return () => subscription.unsubscribe();
   }, [supabase, router]);
  
-  // ── Fetch current user's business ──
   useEffect(() => {
     if (!authToken) return;
-    fetch("/api/me", {
-      headers: { Authorization: `Bearer ${authToken}` },
-    })
+    fetch("/api/me", { headers: { Authorization: `Bearer ${authToken}` } })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.business) {
-          setBusiness(data.business);
-        }
-        setAuthLoading(false);
-      })
+      .then((data) => { if (data.business) setBusiness(data.business); setAuthLoading(false); })
       .catch(() => setAuthLoading(false));
   }, [authToken]);
  
@@ -108,18 +95,11 @@ export default function Dashboard() {
     setMessages(data);
   }, []);
  
-  // Only fetch conversations AFTER business is loaded — prevents showing wrong data
-  useEffect(() => {
-    if (!business?.id) return;
-    fetchConversations();
-  }, [fetchConversations, business?.id]);
- 
+  useEffect(() => { if (!business?.id) return; fetchConversations(); }, [fetchConversations, business?.id]);
   useEffect(() => { if (selectedId) fetchMessages(selectedId); }, [selectedId, fetchMessages]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { if (showSearch) searchInputRef.current?.focus(); }, [showSearch]);
  
-  // ── Realtime ──
-  // Realtime — only subscribe after business is loaded
   useEffect(() => {
     if (!supabase || !business?.id) return;
     const channel = supabase
@@ -163,6 +143,59 @@ export default function Dashboard() {
     setInput("");
     setSending(false);
     fetchMessages(selectedId);
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function cancelImagePreview() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleSendImage() {
+    if (!imageFile || !selectedId || sendingImage) return;
+    setSendingImage(true);
+    try {
+      const fileName = `qr-codes/${Date.now()}-${imageFile.name.replace(/\s/g, "_")}`;
+      const { error: uploadError } = await supabase!
+        .storage
+        .from("media")
+        .upload(fileName, imageFile, { contentType: imageFile.type, upsert: false });
+
+      if (uploadError) {
+        alert("Upload failed: " + uploadError.message);
+        setSendingImage(false);
+        return;
+      }
+
+      const { data: urlData } = supabase!
+        .storage
+        .from("media")
+        .getPublicUrl(fileName);
+
+      await fetch(`/api/conversations/${selectedId}/send-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: urlData.publicUrl, caption: input.trim() }),
+      });
+
+      cancelImagePreview();
+      setInput("");
+      fetchMessages(selectedId);
+    } catch (err) {
+      console.error("Send image error:", err);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setSendingImage(false);
+    }
   }
  
   async function handleVerifyPayment(action: "approve" | "reject") {
@@ -254,7 +287,6 @@ export default function Dashboard() {
     return <p className="text-sm whitespace-pre-wrap">{msg.content}</p>;
   }
  
-  // ── Loading state ──
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -268,34 +300,18 @@ export default function Dashboard() {
  
   return (
     <div className="flex h-screen bg-[#0f0f0f] font-sans overflow-hidden">
- 
-      {/* ── SIDEBAR ── */}
-      <div className={`
-        ${view === "chat" ? "hidden md:flex" : "flex"}
-        w-full md:w-[300px] flex-col border-r border-white/[0.06] flex-shrink-0
-      `} style={{ background: "#141414" }}>
- 
-        {/* Header */}
+      {/* SIDEBAR */}
+      <div className={`${view === "chat" ? "hidden md:flex" : "flex"} w-full md:w-[300px] flex-col border-r border-white/[0.06] flex-shrink-0`} style={{ background: "#141414" }}>
         <div className="px-4 py-3 border-b border-white/[0.06]">
           {showSearch ? (
             <div className="flex items-center gap-2">
               <button onClick={() => { setShowSearch(false); setSearch(""); }} className="p-1.5 text-white/50 hover:text-white transition-colors flex-shrink-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
               </button>
-              <input
-                ref={searchInputRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or number..."
-                className="flex-1 bg-white/[0.05] rounded-lg px-3 py-2 text-sm text-white/90 placeholder:text-white/30 border border-white/[0.06] focus:outline-none focus:border-emerald-500/40 h-9"
-              />
+              <input ref={searchInputRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or number..." className="flex-1 bg-white/[0.05] rounded-lg px-3 py-2 text-sm text-white/90 placeholder:text-white/30 border border-white/[0.06] focus:outline-none focus:border-emerald-500/40 h-9" />
               {search && (
                 <button onClick={() => setSearch("")} className="p-1.5 text-white/40 hover:text-white transition-colors flex-shrink-0">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               )}
             </div>
@@ -303,9 +319,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                 </div>
                 <div>
                   <h1 className="text-xs font-semibold text-white leading-tight truncate max-w-[140px]">{business?.name || "WhatsApp CRM"}</h1>
@@ -314,31 +328,18 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => setShowSearch(true)} className="p-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Search">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </button>
-                <a
-                  href="/onboard"
-                  title="Add / Connect New WhatsApp Number"
-                  className="w-[44px] h-[44px] rounded hover:bg-emerald-500/10 flex items-center justify-center text-white/40 hover:text-emerald-400 transition-colors"
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
+                <a href="/onboard" title="Add New WhatsApp Number" className="w-[44px] h-[44px] rounded hover:bg-emerald-500/10 flex items-center justify-center text-white/40 hover:text-emerald-400 transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </a>
                 <button onClick={handleLogout} className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-red-400 transition-all" title="Logout">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
                 </button>
               </div>
             </div>
           )}
         </div>
- 
-        {/* Conversation List */}
         <div className="flex-1 overflow-y-auto">
           {filteredConvos.length === 0 && (
             <div className="flex flex-col items-center justify-center h-32 gap-2">
@@ -348,21 +349,10 @@ export default function Dashboard() {
           {filteredConvos.map((convo) => {
             const isSelected = selectedId === convo.id;
             return (
-              <button
-                key={convo.id}
-                onClick={() => {
-                  setSelectedId(convo.id);
-                  setNoteInput(convo.internal_note ?? "");
-                  setView("chat");
-                }}
-                className={`w-full text-left px-3 py-3.5 transition-all duration-150 relative ${isSelected ? "bg-white/[0.07]" : "hover:bg-white/[0.04] active:bg-white/[0.06]"}`}
-                style={{ minHeight: 64 }}
-              >
+              <button key={convo.id} onClick={() => { setSelectedId(convo.id); setNoteInput(convo.internal_note ?? ""); setView("chat"); }} className={`w-full text-left px-3 py-3.5 transition-all duration-150 relative ${isSelected ? "bg-white/[0.07]" : "hover:bg-white/[0.04] active:bg-white/[0.06]"}`} style={{ minHeight: 64 }}>
                 {isSelected && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-emerald-500 rounded-r" />}
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center flex-shrink-0 text-white text-[11px] font-semibold">
-                    {getInitials(convo.name, convo.phone)}
-                  </div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center flex-shrink-0 text-white text-[11px] font-semibold">{getInitials(convo.name, convo.phone)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-sm font-medium text-white/90 truncate">{convo.name || convo.phone}</span>
@@ -370,16 +360,11 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
                       <p className="text-xs text-white/40 truncate">
-                        {convo.last_message_type === "image" ? "📷 Photo" :
-                         convo.last_message_type === "audio" ? "🎤 Voice note" :
-                         convo.last_message_type === "document" ? "📄 Document" :
-                         convo.last_message || ""}
+                        {convo.last_message_type === "image" ? "📷 Photo" : convo.last_message_type === "audio" ? "🎤 Voice note" : convo.last_message_type === "document" ? "📄 Document" : convo.last_message || ""}
                       </p>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {convo.payment_status === "pending" && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${convo.mode === "agent" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
-                          {convo.mode === "agent" ? "AI" : "You"}
-                        </span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${convo.mode === "agent" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>{convo.mode === "agent" ? "AI" : "You"}</span>
                       </div>
                     </div>
                   </div>
@@ -389,18 +374,13 @@ export default function Dashboard() {
           })}
         </div>
       </div>
- 
-      {/* ── CHAT PANEL ── */}
-      <div className={`
-        ${view === "list" ? "hidden md:flex" : "flex"}
-        flex-1 flex-col min-w-0
-      `}>
+
+      {/* CHAT PANEL */}
+      <div className={`${view === "list" ? "hidden md:flex" : "flex"} flex-1 flex-col min-w-0`}>
         {!selected ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3">
             <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-white/40">Select a conversation</p>
@@ -412,33 +392,21 @@ export default function Dashboard() {
             {/* Chat Header */}
             <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0" style={{ background: "#141414" }}>
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* Back button — mobile only */}
-                <button
-                  onClick={() => { setView("list"); setSelectedId(null); }}
-                  className="md:hidden p-1.5 -ml-1 rounded-lg text-white/50 hover:text-white transition-colors flex-shrink-0"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
+                <button onClick={() => { setView("list"); setSelectedId(null); }} className="md:hidden p-1.5 -ml-1 rounded-lg text-white/50 hover:text-white transition-colors flex-shrink-0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
                 </button>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
-                  {getInitials(selected.name, selected.phone)}
-                </div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">{getInitials(selected.name, selected.phone)}</div>
                 <div className="min-w-0">
                   <h2 className="text-xs font-semibold text-white leading-tight truncate">{selected.name || selected.phone}</h2>
                   <p className="text-[10px] text-white/40 leading-tight">{selected.phone}</p>
                 </div>
                 {selected.payment_status !== "none" && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ml-1 hidden sm:inline ${PAYMENT_COLORS[selected.payment_status]}`}>
-                    {PAYMENT_LABELS[selected.payment_status]}
-                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ml-1 hidden sm:inline ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button onClick={() => setShowDetails((v) => !v)} className="hidden md:flex p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Toggle details">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
-                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
                 </button>
                 <button onClick={toggleMode} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${selected.mode === "agent" ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20" : "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/20"}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${selected.mode === "agent" ? "bg-emerald-400" : "bg-amber-400"}`} />
@@ -447,10 +415,9 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
- 
+
             {/* Messages + Details */}
             <div className="flex-1 flex min-h-0">
-              {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                   {messages.map((msg, i) => {
@@ -474,34 +441,52 @@ export default function Dashboard() {
                   })}
                   <div ref={messagesEndRef} />
                 </div>
- 
+
                 {/* Input */}
                 <div className="px-4 py-3 border-t border-white/[0.06] flex-shrink-0" style={{ background: "#141414", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+                  {imagePreview && (
+                    <div className="mb-2.5 flex items-center gap-2 bg-white/[0.04] rounded-xl px-3 py-2 border border-white/[0.06]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imagePreview} alt="Preview" className="w-12 h-12 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] text-white/60 truncate">{imageFile?.name}</p>
+                        <p className="text-[10px] text-white/30">Ready to send</p>
+                      </div>
+                      <button onClick={cancelImagePreview} className="p-1 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.05] transition-all flex-shrink-0">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2.5 bg-white/[0.06] rounded-xl px-3.5 py-2.5 border border-white/[0.06] focus-within:border-emerald-500/40 transition-colors">
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                      placeholder="Type a message..."
-                      className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25 focus:outline-none"
-                    />
-                    <button onClick={handleSend} disabled={sending || !input.trim()} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
-                      {sending ? (
-                        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                        </svg>
-                      ) : (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                        </svg>
-                      )}
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                    <button onClick={() => fileInputRef.current?.click()} title="Send image" className="text-white/30 hover:text-emerald-400 transition-colors flex-shrink-0">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                      </svg>
                     </button>
+                    <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (imagePreview ? handleSendImage() : handleSend())} placeholder={imagePreview ? "Add a caption (optional)..." : "Type a message..."} className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25 focus:outline-none" />
+                    {imagePreview ? (
+                      <button onClick={handleSendImage} disabled={sendingImage} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
+                        {sendingImage ? (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                        )}
+                      </button>
+                    ) : (
+                      <button onClick={handleSend} disabled={sending || !input.trim()} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
+                        {sending ? (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
- 
-              {/* ── RIGHT DETAILS PANEL — desktop only ── */}
+
+              {/* RIGHT DETAILS PANEL */}
               {showDetails && (
                 <div className="hidden md:flex w-[240px] border-l border-white/[0.06] flex-col overflow-y-auto flex-shrink-0" style={{ background: "#141414" }}>
                   <div className="p-4 space-y-5">
@@ -510,7 +495,6 @@ export default function Dashboard() {
                       <p className="text-xs font-medium text-white/80">{selected.name || "Unknown"}</p>
                       <p className="text-[11px] text-white/40 mt-0.5">{selected.phone}</p>
                     </div>
- 
                     {selected.payment_status === "pending" && (
                       <div>
                         <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
@@ -521,14 +505,12 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
- 
                     {(selected.payment_status === "verified" || selected.payment_status === "rejected") && (
                       <div>
                         <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
                         <span className={`text-[11px] px-2 py-1 rounded-lg border ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
                       </div>
                     )}
- 
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Tags</p>
                       <div className="flex flex-wrap gap-1 mb-2">
@@ -544,13 +526,11 @@ export default function Dashboard() {
                         <button onClick={addTag} className="px-2 rounded-lg bg-white/[0.07] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all text-xs">+</button>
                       </div>
                     </div>
- 
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Internal Note</p>
                       <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Add a private note..." rows={3} className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none" />
                       <button onClick={saveNote} className="mt-1.5 w-full py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all">Save Note</button>
                     </div>
- 
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Usage</p>
                       <div className="space-y-1">
