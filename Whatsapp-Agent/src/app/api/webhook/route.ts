@@ -167,13 +167,23 @@ export async function POST(request: NextRequest) {
       return Response.json({ status: "stored_for_human" });
     }
 
-    // DETERMINISTIC IMAGE HANDLING
-    // If the user sent an image with NO caption, we bypass the AI completely
+    // DETERMINISTIC MEDIA HANDLING
+    // If the user sent media with NO caption, we bypass the AI completely
     // to ensure 100% accurate responses and save API costs.
-    if (mediaType === "image" && text === "[image]") {
-      const replyText = isPaymentScreenshot
-        ? "Thank you for the payment screenshot! 🙏 Our team will verify and confirm shortly 💛"
-        : "Thank you for sending! 📩 We have received your image. Our team will get back to you shortly 💛";
+    if (mediaType && text === `[${msgType}]`) {
+      let replyText = "Thank you for sharing your file. Our team will get back to you shortly 💛";
+
+      if (msgType === "image") {
+        replyText = isPaymentScreenshot
+          ? "Thank you for the payment screenshot! 🙏 Our team will verify and confirm shortly 💛"
+          : "Thank you for sending! 📩 We have received your image. Our team will get back to you shortly 💛";
+      } else if (msgType === "audio") {
+        replyText = "Thank you for your voice note! 🎤 Our team will listen and get back to you shortly 💛";
+      } else if (msgType === "document") {
+        replyText = "Thank you for sending the document! 📄 Our team will review it and get back to you shortly 💛";
+      } else if (msgType === "video") {
+        replyText = "Thank you for the video! 🎥 Our team will take a look and get back to you shortly 💛";
+      }
 
       await sendWhatsAppMessage(phone, replyText, {
         phoneNumberId: incomingPhoneNumberId,
@@ -186,7 +196,7 @@ export async function POST(request: NextRequest) {
         content: replyText,
       });
 
-      return Response.json({ status: "replied_image_auto" });
+      return Response.json({ status: "replied_media_auto" });
     }
 
     // Fetch conversation history (last 20 messages for context)
