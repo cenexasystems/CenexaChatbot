@@ -284,10 +284,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Always send a reply — either AI or fallback
-    await sendWhatsAppMessage(phone, reply, {
+    const waResult = await sendWhatsAppMessage(phone, reply, {
       phoneNumberId: incomingPhoneNumberId,
       accessToken: businessAccessToken ?? undefined,
     });
+
+    if (waResult.error) {
+      // Store the error message in the dashboard so we can debug it
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: `❌ WHATSAPP API ERROR: ${JSON.stringify(waResult.error)}`,
+      });
+      return Response.json({ status: "whatsapp_api_error" });
+    }
 
     // Store AI response
     await supabase.from("messages").insert({
