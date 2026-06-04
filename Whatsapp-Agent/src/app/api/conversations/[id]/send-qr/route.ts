@@ -62,7 +62,7 @@ export async function POST(
   const waResult = await sendWhatsAppImage(
     conversation.phone,
     qrUrl,
-    "Please scan this QR code to complete your advance payment 💳",
+    "Please scan this QR code to complete your advance payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
     { phoneNumberId: biz.phone_number_id, accessToken: biz.access_token }
   );
 
