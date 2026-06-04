@@ -140,10 +140,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Store user message (ignore duplicates)
+    const storedText = isPaymentScreenshot && text === "[image]" ? "[Payment Screenshot]" : text;
+    
     const { error: insertError } = await supabase.from("messages").insert({
       conversation_id: conversation.id,
       role: "user",
-      content: text,
+      content: storedText,
       whatsapp_msg_id: whatsappMsgId,
       media_url: mediaUrl,
       media_type: mediaType,
@@ -165,10 +167,32 @@ export async function POST(request: NextRequest) {
       return Response.json({ status: "stored_for_human" });
     }
 
+    // DETERMINISTIC IMAGE HANDLING
+    // If the user sent an image with NO caption, we bypass the AI completely
+    // to ensure 100% accurate responses and save API costs.
+    if (mediaType === "image" && text === "[image]") {
+      const replyText = isPaymentScreenshot
+        ? "Thank you for the payment screenshot! 🙏 Our team will verify and confirm shortly 💛"
+        : "Thank you for sending! 📩 We have received your image. Our team will get back to you shortly 💛";
+
+      await sendWhatsAppMessage(phone, replyText, {
+        phoneNumberId: incomingPhoneNumberId,
+        accessToken: businessAccessToken ?? undefined,
+      });
+
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: replyText,
+      });
+
+      return Response.json({ status: "replied_image_auto" });
+    }
+
     // Fetch conversation history (last 20 messages for context)
     const { data: historyData } = await supabase
       .from("messages")
-      .select("role, content")
+      .select("role, content, media_type, is_payment_screenshot")
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -218,10 +242,21 @@ export async function POST(request: NextRequest) {
 
     // Call AI with per-business overrides
     const { reply, error } = await getAIResponse(
-      (history || []).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+      (history || []).map((m) => {
+        let aiContent = m.content;
+        // Inject explicit context for the AI if it's an image with a caption
+        if (m.media_type === "image" && m.role === "user") {
+          if (m.is_payment_screenshot) {
+             aiContent = `[System Note: User attached a Payment Screenshot] ${m.content}`;
+          } else {
+             aiContent = `[System Note: User attached a General Image] ${m.content}`;
+          }
+        }
+        return {
+          role: m.role as "user" | "assistant",
+          content: aiContent,
+        };
+      }),
       businessSystemPrompt ?? undefined,
       businessApiKey ?? undefined,
       businessModel ?? undefined
