@@ -65,7 +65,7 @@ export async function POST(
       conversation_id: id,
       role: "assistant",
       content: caption ? `[Image] ${caption}` : "[Image sent]",
-      media_url: imageUrl,
+      media_url: imageUrl, media_type: "image",
     })
     .select()
     .single();
