@@ -22,10 +22,9 @@ export async function GET() {
       return NextResponse.json({ error: "Profile or business not found" }, { status: 404 });
     }
 
-    // Get the business details
     const { data: business, error: businessError } = await supabase
       .from("businesses")
-      .select("id, name")
+      .select("id, name, qr_image_url")
       .eq("id", profile.business_id)
       .single();
 
