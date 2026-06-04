@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call AI with per-business overrides
-    const { reply, error } = await getAIResponse(
+    let { reply, error } = await getAIResponse(
       (history || []).map((m) => {
         let aiContent = m.content;
         // Inject explicit context for the AI if it's an image with a caption
@@ -271,6 +271,12 @@ export async function POST(request: NextRequest) {
       businessApiKey ?? undefined,
       businessModel ?? undefined
     );
+
+    // WhatsApp does not support markdown links [text](url).
+    // Convert them to plain text so they are clickable: "text: url"
+    if (reply) {
+      reply = reply.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "$1: $2");
+    }
 
     // If AI failed — switch to human mode automatically
     if (error) {
