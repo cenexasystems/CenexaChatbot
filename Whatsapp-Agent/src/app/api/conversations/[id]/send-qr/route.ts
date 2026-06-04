@@ -83,7 +83,7 @@ export async function POST(
   await adminSupabase.from("messages").insert({
     conversation_id: id,
     role: "assistant",
-    content: "💳 QR Code sent for payment",
+    content: "Please scan this QR code to complete your advance payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
     media_url: qrUrl,
     media_type: "image",
   });
