@@ -36,6 +36,18 @@ export default function Dashboard() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // Persist theme in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("dash-theme") as "dark" | "light" | null;
+    if (saved) setTheme(saved);
+  }, []);
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("dash-theme", next);
+  }
   const [tagInput, setTagInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -387,16 +399,16 @@ export default function Dashboard() {
   }
  
   return (
-    <div className="flex h-screen bg-[#0f0f0f] font-sans overflow-hidden">
+    <div className={`flex h-screen font-sans overflow-hidden dash-bg ${theme === "light" ? "dashboard-light" : ""}`}>
  
       {/* ── SIDEBAR ── */}
       <div className={`
         ${view === "chat" ? "hidden md:flex" : "flex"}
-        w-full md:w-[300px] flex-col border-r border-white/[0.06] flex-shrink-0
-      `} style={{ background: "#141414" }}>
+        w-full md:w-[300px] flex-col border-r dash-border flex-shrink-0 dash-sidebar
+      `}>
  
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/[0.06]">
+        <div className="px-4 py-3 border-b dash-border">
           {showSearch ? (
             <div className="flex items-center gap-2">
               <button onClick={() => { setShowSearch(false); setSearch(""); }} className="p-1.5 text-white/50 hover:text-white transition-colors flex-shrink-0">
@@ -428,12 +440,24 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-xs font-semibold text-white leading-tight truncate max-w-[140px]">{business?.name || "WhatsApp CRM"}</h1>
+                  <h1 className="text-xs font-semibold dash-text-primary leading-tight truncate max-w-[140px]">{business?.name || "WhatsApp CRM"}</h1>
                   <p className="text-[10px] text-white/40">{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setShowSearch(true)} className="p-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Search">
+                {/* Theme toggle */}
+                <button onClick={toggleTheme} className="p-2 rounded-lg dash-text-secondary hover:bg-white/[0.05] transition-all" title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+                  {theme === "dark" ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                  )}
+                </button>
+                <button onClick={() => setShowSearch(true)} className="p-2 rounded-lg dash-text-secondary hover:bg-white/[0.05] transition-all" title="Search">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
@@ -521,7 +545,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0" style={{ background: "#141414" }}>
+            <div className="px-4 py-3 border-b dash-border flex items-center justify-between flex-shrink-0 dash-sidebar">
               <div className="flex items-center gap-2.5 min-w-0">
                 {/* Back button — mobile only */}
                 <button
@@ -536,8 +560,8 @@ export default function Dashboard() {
                   {getInitials(selected.name, selected.phone)}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-xs font-semibold text-white leading-tight truncate">{selected.name || selected.phone}</h2>
-                  <p className="text-[10px] text-white/40 leading-tight">{selected.phone}</p>
+                  <h2 className="text-xs font-semibold dash-text-primary leading-tight truncate">{selected.name || selected.phone}</h2>
+                  <p className="text-[10px] dash-text-secondary leading-tight">{selected.phone}</p>
                 </div>
                 {selected.payment_status !== "none" && (
                   <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ml-1 hidden sm:inline ${PAYMENT_COLORS[selected.payment_status]}`}>
@@ -563,7 +587,7 @@ export default function Dashboard() {
             <div className="flex-1 flex min-h-0">
               {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg">
                   {messages.map((msg, i) => {
                     const isUser = msg.role === "user";
                     const showTime = i === messages.length - 1 || messages[i + 1]?.role !== msg.role;
@@ -587,7 +611,7 @@ export default function Dashboard() {
                 </div>
  
                 {/* Input */}
-                <div className="px-4 py-3 border-t border-white/[0.06] flex-shrink-0" style={{ background: "#141414", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+                <div className="px-4 py-3 border-t dash-border flex-shrink-0 dash-sidebar" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
                   {/* Image Preview */}
                   {imagePreview && (
                     <div className="mb-2.5 flex items-center gap-2 bg-white/[0.04] rounded-xl px-3 py-2 border border-white/[0.06]">
@@ -664,12 +688,12 @@ export default function Dashboard() {
  
               {/* ── RIGHT DETAILS PANEL — desktop only ── */}
               {showDetails && (
-                <div className="hidden md:flex w-[240px] border-l border-white/[0.06] flex-col overflow-y-auto flex-shrink-0" style={{ background: "#141414" }}>
+                <div className="hidden md:flex w-[240px] border-l dash-border flex-col overflow-y-auto flex-shrink-0 dash-sidebar">
                   <div className="p-4 space-y-5">
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Customer</p>
-                      <p className="text-xs font-medium text-white/80">{selected.name || "Unknown"}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">{selected.phone}</p>
+                      <p className="text-[10px] font-medium dash-text-label uppercase tracking-wider mb-2">Customer</p>
+                      <p className="text-xs font-medium dash-text-primary">{selected.name || "Unknown"}</p>
+                      <p className="text-[11px] dash-text-secondary mt-0.5">{selected.phone}</p>
                     </div>
  
                     {selected.payment_status === "pending" && (
