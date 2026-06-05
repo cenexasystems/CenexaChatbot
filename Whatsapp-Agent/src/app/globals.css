@@ -11,8 +11,14 @@
   --dash-hover: rgba(255,255,255,0.04);
   --dash-selected: rgba(255,255,255,0.07);
   --dash-input-bg: rgba(255,255,255,0.06);
+  
   --dash-msg-user-bg: rgba(255,255,255,0.07);
   --dash-msg-user-border: rgba(255,255,255,0.06);
+  --dash-msg-user-text: rgba(255,255,255,0.90);
+  
+  --dash-msg-ai-bg: #059669; /* emerald-600 */
+  --dash-msg-ai-text: #ffffff;
+
   --dash-text-primary: rgba(255,255,255,0.90);
   --dash-text-secondary: rgba(255,255,255,0.40);
   --dash-text-muted: rgba(255,255,255,0.25);
@@ -24,25 +30,31 @@
   --dash-note-text: rgba(253,230,138,0.80);
 }
 
-/* ── Light theme overrides ── */
+/* ── Light theme overrides (WhatsApp Web style) ── */
 .dashboard-light {
-  --dash-bg: #f0f2f5;
+  --dash-bg: #efeae2; /* Classic WhatsApp beige background */
   --dash-sidebar: #ffffff;
   --dash-border: rgba(0,0,0,0.08);
   --dash-hover: rgba(0,0,0,0.04);
   --dash-selected: rgba(0,0,0,0.06);
   --dash-input-bg: rgba(0,0,0,0.05);
+  
   --dash-msg-user-bg: #ffffff;
-  --dash-msg-user-border: rgba(0,0,0,0.08);
+  --dash-msg-user-border: rgba(0,0,0,0.05);
+  --dash-msg-user-text: rgba(0,0,0,0.87);
+  
+  --dash-msg-ai-bg: #d9fdd3; /* WhatsApp sent message green */
+  --dash-msg-ai-text: rgba(0,0,0,0.87);
+
   --dash-text-primary: rgba(0,0,0,0.85);
   --dash-text-secondary: rgba(0,0,0,0.45);
   --dash-text-muted: rgba(0,0,0,0.30);
   --dash-text-label: rgba(0,0,0,0.35);
   --dash-pill-bg: rgba(0,0,0,0.06);
   --dash-pill-border: rgba(0,0,0,0.10);
-  --dash-note-bg: rgba(245,158,11,0.12);
-  --dash-note-border: rgba(245,158,11,0.30);
-  --dash-note-text: rgba(120,80,0,0.90);
+  --dash-note-bg: #fff8e1; /* Lighter amber for notes */
+  --dash-note-border: #fde68a;
+  --dash-note-text: #b45309;
 }
 
 /* ── Theme-aware utility classes ── */
@@ -56,7 +68,10 @@
 .dash-hover:hover    { background-color: var(--dash-hover); }
 .dash-selected  { background-color: var(--dash-selected); }
 .dash-input-bg  { background-color: var(--dash-input-bg); }
-.dash-msg-user  { background-color: var(--dash-msg-user-bg); border-color: var(--dash-msg-user-border); }
+
+.dash-msg-user  { background-color: var(--dash-msg-user-bg); border-color: var(--dash-msg-user-border); color: var(--dash-msg-user-text); }
+.dash-msg-ai    { background-color: var(--dash-msg-ai-bg); color: var(--dash-msg-ai-text); }
+
 .dash-pill      { background-color: var(--dash-pill-bg); border-color: var(--dash-pill-border); }
 .dash-note      { background-color: var(--dash-note-bg); border-color: var(--dash-note-border); color: var(--dash-note-text); }
 
@@ -89,7 +104,7 @@ body {
 .dashboard-light .text-white\/20 { color: rgba(0,0,0,0.25) !important; }
 
 /* Background colours */
-.dashboard-light .bg-\[\#0f0f0f\]           { background-color: #f0f2f5 !important; }
+.dashboard-light .bg-\[\#0f0f0f\]           { background-color: #efeae2 !important; }
 .dashboard-light .bg-\[\#141414\]           { background-color: #ffffff !important; }
 .dashboard-light .bg-white\/\[0\.07\]       { background-color: rgba(0,0,0,0.06) !important; }
 .dashboard-light .bg-white\/\[0\.06\]       { background-color: rgba(0,0,0,0.05) !important; }
@@ -103,7 +118,6 @@ body {
 .dashboard-light .border-white\/20         { border-color: rgba(0,0,0,0.15) !important; }
 
 /* Conversation list item selected/hover */
-.dashboard-light .bg-white\/\[0\.07\]      { background-color: rgba(0,0,0,0.06) !important; }
 .dashboard-light .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.04) !important; }
 .dashboard-light .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.05) !important; }
 .dashboard-light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.05) !important; }
@@ -111,9 +125,9 @@ body {
 
 /* Input / textarea placeholders */
 .dashboard-light input::placeholder,
-.dashboard-light textarea::placeholder { color: rgba(0,0,0,0.30) !important; }
+.dashboard-light textarea::placeholder { color: rgba(0,0,0,0.40) !important; }
 
 /* Scrollbar (light) */
-.dashboard-light ::-webkit-scrollbar-track { background: #f0f2f5; }
+.dashboard-light ::-webkit-scrollbar-track { background: #efeae2; }
 .dashboard-light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
 .dashboard-light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }

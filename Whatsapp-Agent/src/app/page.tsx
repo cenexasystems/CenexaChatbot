@@ -594,7 +594,7 @@ export default function Dashboard() {
                     return (
                       <div key={msg.id} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
                         <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%]`}>
-                          <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "bg-white/[0.07] text-white/90 rounded-tl-sm border border-white/[0.06]" : "bg-emerald-600 text-white rounded-tr-sm"}`}>
+                          <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "dash-msg-user rounded-tl-sm border" : "dash-msg-ai rounded-tr-sm"}`}>
                             {renderMessageContent(msg)}
                           </div>
                           {showTime && (
