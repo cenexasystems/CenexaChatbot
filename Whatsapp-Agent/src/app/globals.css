@@ -93,15 +93,22 @@ body {
    ───────────────────────────────────────────────────── */
 
 /* Text colours */
-.dashboard-light .text-white { color: rgba(0,0,0,0.87) !important; }
-.dashboard-light .text-white\/90 { color: rgba(0,0,0,0.87) !important; }
-.dashboard-light .text-white\/80 { color: rgba(0,0,0,0.75) !important; }
-.dashboard-light .text-white\/60 { color: rgba(0,0,0,0.55) !important; }
-.dashboard-light .text-white\/50 { color: rgba(0,0,0,0.50) !important; }
-.dashboard-light .text-white\/40 { color: rgba(0,0,0,0.42) !important; }
-.dashboard-light .text-white\/30 { color: rgba(0,0,0,0.35) !important; }
-.dashboard-light .text-white\/25 { color: rgba(0,0,0,0.30) !important; }
-.dashboard-light .text-white\/20 { color: rgba(0,0,0,0.25) !important; }
+.dashboard-light .text-white { color: rgba(0,0,0,0.95) !important; }
+.dashboard-light .text-white\/90 { color: rgba(0,0,0,0.90) !important; }
+.dashboard-light .text-white\/80 { color: rgba(0,0,0,0.85) !important; }
+.dashboard-light .text-white\/60 { color: rgba(0,0,0,0.70) !important; }
+.dashboard-light .text-white\/50 { color: rgba(0,0,0,0.65) !important; }
+.dashboard-light .text-white\/40 { color: rgba(0,0,0,0.55) !important; }
+.dashboard-light .text-white\/30 { color: rgba(0,0,0,0.50) !important; }
+.dashboard-light .text-white\/25 { color: rgba(0,0,0,0.45) !important; }
+.dashboard-light .text-white\/20 { color: rgba(0,0,0,0.40) !important; }
+
+/* Colored text overrides for light mode */
+.dashboard-light .text-emerald-400 { color: #047857 !important; } /* emerald-700 */
+.dashboard-light .text-amber-400 { color: #b45309 !important; } /* amber-700 */
+.dashboard-light .text-amber-200\/80 { color: #92400e !important; } /* amber-800 */
+.dashboard-light .text-red-400 { color: #b91c1c !important; } /* red-700 */
+.dashboard-light .text-red-400\/70 { color: #dc2626 !important; } /* red-600 */
 
 /* Background colours */
 .dashboard-light .bg-\[\#0f0f0f\]           { background-color: #efeae2 !important; }
