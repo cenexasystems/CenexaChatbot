@@ -278,6 +278,17 @@ export async function POST(request: NextRequest) {
       reply = reply.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "$1: $2");
     }
 
+    // --- SMART PAYMENT AUTO-DETECTION ---
+    // If the AI autonomously asks the user to pay and send a screenshot,
+    // we automatically flip the payment_qr_sent switch so the next image is treated as a payment!
+    let setPaymentQrSent = false;
+    if (reply) {
+      const lowerReply = reply.toLowerCase();
+      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("98405") || lowerReply.includes("pay"))) {
+        setPaymentQrSent = true;
+      }
+    }
+
     // If AI failed — switch to human mode automatically
     if (error) {
       await supabase.from("conversations").update({ mode: "human" }).eq("id", conversation.id);
@@ -306,10 +317,15 @@ export async function POST(request: NextRequest) {
       content: reply,
     });
 
-    // Update conversation timestamp again
+    // Update conversation timestamp (and payment flag if needed)
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (setPaymentQrSent) {
+      updatePayload.payment_qr_sent = true;
+    }
+
     await supabase
       .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", conversation.id);
 
     return Response.json({ status: "replied" });
