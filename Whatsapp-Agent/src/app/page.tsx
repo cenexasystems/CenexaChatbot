@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [noteEditMode, setNoteEditMode] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [view, setView] = useState<"list" | "chat">("list");
@@ -718,25 +719,83 @@ export default function Dashboard() {
  
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Tags</p>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 mb-2">
                         {(selected.tags ?? []).length === 0 && (
                           <p className="text-[10px] text-white/20">No tags</p>
                         )}
                         {(selected.tags ?? []).map((tag) => (
                           <span key={tag} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.07] text-white/60 border border-white/10">
                             {tag}
-                            <button onClick={() => removeTag(tag)} className="text-white/30 hover:text-white/60 transition-colors">×</button>
+                            <button onClick={() => removeTag(tag)} className="text-white/30 hover:text-red-400 transition-colors">×</button>
                           </span>
                         ))}
+                      </div>
+                      <div className="flex gap-1">
+                        <input
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && addTag()}
+                          placeholder="Add tag..."
+                          className="flex-1 bg-white/[0.05] rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20"
+                        />
+                        <button onClick={addTag} className="px-2.5 rounded-lg bg-white/[0.07] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all text-xs font-medium">+</button>
                       </div>
                     </div>
  
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Internal Note</p>
-                      <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Add a private note..." rows={3} className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none" />
-                      <button onClick={saveNote} disabled={savingNote} className="mt-1.5 w-full py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all disabled:opacity-50">
-                        {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
-                      </button>
+                      {selected.internal_note && !noteEditMode ? (
+                        // Saved note view
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-2 mb-1.5">
+                          <p className="text-[11px] text-amber-200/80 whitespace-pre-wrap leading-relaxed">{selected.internal_note}</p>
+                          <div className="flex gap-1.5 mt-2">
+                            <button
+                              onClick={() => { setNoteEditMode(true); setNoteInput(selected.internal_note ?? ""); }}
+                              className="flex-1 py-1 rounded-md bg-white/[0.07] text-[10px] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all"
+                            >✏️ Edit</button>
+                            <button
+                              onClick={async () => {
+                                setNoteInput("");
+                                setSavingNote(true);
+                                await fetch(`/api/conversations/${selected.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json", ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+                                  body: JSON.stringify({ internal_note: "" }),
+                                });
+                                setSavingNote(false);
+                                setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: "" } : c));
+                              }}
+                              className="flex-1 py-1 rounded-md bg-red-500/10 text-[10px] text-red-400/70 hover:text-red-400 border border-red-500/20 transition-all"
+                            >🗑️ Delete</button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Edit / new note view
+                        <>
+                          <textarea
+                            value={noteInput}
+                            onChange={(e) => setNoteInput(e.target.value)}
+                            placeholder="Add a private note..."
+                            rows={3}
+                            className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none"
+                          />
+                          <div className="flex gap-1.5 mt-1.5">
+                            {noteEditMode && (
+                              <button
+                                onClick={() => setNoteEditMode(false)}
+                                className="flex-1 py-1.5 rounded-lg bg-white/[0.05] text-[11px] text-white/30 hover:text-white/60 border border-white/[0.06] transition-all"
+                              >Cancel</button>
+                            )}
+                            <button
+                              onClick={async () => { await saveNote(); setNoteEditMode(false); }}
+                              disabled={savingNote}
+                              className="flex-1 py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all disabled:opacity-50"
+                            >
+                              {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
  
                     <div>
