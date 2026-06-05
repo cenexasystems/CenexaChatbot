@@ -38,6 +38,8 @@ export default function Dashboard() {
   const [showSearch, setShowSearch] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [view, setView] = useState<"list" | "chat">("list");
@@ -308,13 +310,23 @@ export default function Dashboard() {
   }
  
   async function saveNote() {
-    if (!selected) return;
-    await fetch(`/api/conversations/${selected.id}`, {
+    if (!selected || savingNote) return;
+    setSavingNote(true);
+    setNoteSaved(false);
+    const res = await fetch(`/api/conversations/${selected.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
       body: JSON.stringify({ internal_note: noteInput }),
     });
-    setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: noteInput } : c));
+    setSavingNote(false);
+    if (res.ok) {
+      setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: noteInput } : c));
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 2000);
+    }
   }
  
   function formatTime(dateStr: string) {
@@ -425,16 +437,7 @@ export default function Dashboard() {
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </button>
-                <a
-                  href="/onboard"
-                  title="Add / Connect New WhatsApp Number"
-                  className="w-[44px] h-[44px] rounded hover:bg-emerald-500/10 flex items-center justify-center text-white/40 hover:text-emerald-400 transition-colors"
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </a>
+
                 <button onClick={handleLogout} className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-red-400 transition-all" title="Logout">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
@@ -715,7 +718,10 @@ export default function Dashboard() {
  
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Tags</p>
-                      <div className="flex flex-wrap gap-1 mb-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(selected.tags ?? []).length === 0 && (
+                          <p className="text-[10px] text-white/20">No tags</p>
+                        )}
                         {(selected.tags ?? []).map((tag) => (
                           <span key={tag} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.07] text-white/60 border border-white/10">
                             {tag}
@@ -723,16 +729,14 @@ export default function Dashboard() {
                           </span>
                         ))}
                       </div>
-                      <div className="flex gap-1">
-                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.05] rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20" />
-                        <button onClick={addTag} className="px-2 rounded-lg bg-white/[0.07] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all text-xs">+</button>
-                      </div>
                     </div>
  
                     <div>
                       <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Internal Note</p>
                       <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Add a private note..." rows={3} className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none" />
-                      <button onClick={saveNote} className="mt-1.5 w-full py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all">Save Note</button>
+                      <button onClick={saveNote} disabled={savingNote} className="mt-1.5 w-full py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all disabled:opacity-50">
+                        {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
+                      </button>
                     </div>
  
                     <div>
