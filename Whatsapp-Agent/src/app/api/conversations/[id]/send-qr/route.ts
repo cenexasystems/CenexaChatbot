@@ -62,7 +62,7 @@ export async function POST(
   const waResult = await sendWhatsAppImage(
     conversation.phone,
     qrUrl,
-    "Please scan this QR code to complete your advance payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
+    "Please scan this QR code to complete your advance payment 💳\n\nAlternatively, you can pay via GPay using:\nUPI ID: b2bridalstudio@sbi\nNumber: +91 98405 51365\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
     { phoneNumberId: biz.phone_number_id, accessToken: biz.access_token }
   );
 
@@ -83,7 +83,7 @@ export async function POST(
   await adminSupabase.from("messages").insert({
     conversation_id: id,
     role: "assistant",
-    content: "Please scan this QR code to complete your advance payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
+    content: "Please scan this QR code to complete your advance payment 💳\n\nAlternatively, you can pay via GPay using:\nUPI ID: b2bridalstudio@sbi\nNumber: +91 98405 51365\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
     media_url: qrUrl,
     media_type: "image",
   });
