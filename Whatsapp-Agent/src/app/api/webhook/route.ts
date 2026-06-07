@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
         businessAccessToken = biz.access_token;
         businessApiKey = biz.openrouter_api_key;
         businessModel = biz.ai_model;
-        businessSystemPrompt = biz.system_prompt;
-        businessWelcomeMessage = biz.welcome_message;
+        businessSystemPrompt = biz.system_prompt ? biz.system_prompt.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
+        businessWelcomeMessage = biz.welcome_message ? biz.welcome_message.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
       }
     }
 
