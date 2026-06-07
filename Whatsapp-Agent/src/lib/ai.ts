@@ -15,6 +15,15 @@ IMPORTANT RULES FOR MEDIA:
 - NEVER ask the user to summarize a document or image.
 `;
 
+const WEBSITE_INSTRUCTIONS = `
+IMPORTANT RULES FOR WEBSITE LINKS (B2 Bridal Studio):
+- To know about the studio: b2bridalstudio.com/about
+- For services: b2bridalstudio.com/services
+- To know about previous works/gallery: b2bridalstudio.com/gallery
+- To view courses: b2bridalstudio.com/courses
+Always try to use these exact links when the user asks for related information.
+`;
+
 export async function getAIResponse(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPromptOverride?: string,
@@ -27,7 +36,7 @@ export async function getAIResponse(
       apiKey: apiKeyOverride ?? process.env.OPENROUTER_API_KEY ?? "",
     });
 
-    const finalSystemPrompt = (systemPromptOverride ?? SYSTEM_PROMPT) + "\n\n" + MEDIA_INSTRUCTIONS;
+    const finalSystemPrompt = (systemPromptOverride ?? SYSTEM_PROMPT) + "\n\n" + MEDIA_INSTRUCTIONS + "\n\n" + WEBSITE_INSTRUCTIONS;
 
     const completion = await openai.chat.completions.create({
       model: modelOverride ?? process.env.AI_MODEL ?? "openai/gpt-4o-mini",

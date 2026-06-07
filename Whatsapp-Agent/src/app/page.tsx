@@ -500,7 +500,18 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-medium text-white/90 truncate">{convo.name || convo.phone}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-medium text-white/90 truncate">{convo.name || convo.phone}</span>
+                        {convo.payment_status && convo.payment_status !== "none" && (
+                          <span className={`text-[8px] px-1 py-0.2 rounded font-bold flex-shrink-0 border uppercase tracking-wider ${
+                            convo.payment_status === "verified" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
+                            convo.payment_status === "pending" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                            "bg-red-500/20 text-red-400 border-red-500/30"
+                          }`}>
+                            {convo.payment_status}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-white/30 flex-shrink-0">{formatTime(convo.updated_at)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -511,7 +522,6 @@ export default function Dashboard() {
                          convo.last_message || ""}
                       </p>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {convo.payment_status === "pending" && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${convo.mode === "agent" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
                           {convo.mode === "agent" ? "AI" : "You"}
                         </span>
@@ -570,7 +580,7 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button onClick={() => setShowDetails((v) => !v)} className="hidden md:flex p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Toggle details">
+                <button onClick={() => setShowDetails((v) => !v)} className="flex p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Toggle details">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
                   </svg>
@@ -686,92 +696,115 @@ export default function Dashboard() {
                 </div>
               </div>
  
-              {/* ── RIGHT DETAILS PANEL — desktop only ── */}
+              {/* Mobile details backdrop overlay */}
               {showDetails && (
-                <div className="hidden md:flex w-[240px] border-l dash-border flex-col overflow-y-auto flex-shrink-0 dash-sidebar">
+                <div 
+                  className="fixed inset-0 bg-black/60 z-30 md:hidden transition-opacity duration-300"
+                  onClick={() => setShowDetails(false)}
+                />
+              )}
+
+              {/* ── RIGHT DETAILS PANEL ── */}
+              {showDetails && (
+                <div className={`
+                  fixed inset-y-0 right-0 z-40 w-[280px] sm:w-[320px] md:relative md:w-[240px] md:z-0
+                  border-l dash-border flex flex-col overflow-y-auto flex-shrink-0 shadow-2xl md:shadow-none
+                  transition-all duration-300 ease-in-out dash-sidebar
+                `}>
                   <div className="p-4 space-y-5">
+                    {/* Mobile Close Header */}
+                    <div className="flex md:hidden items-center justify-between pb-3 border-b dash-border mb-2">
+                      <span className="text-sm font-bold dash-text-primary">Customer Details</span>
+                      <button 
+                        onClick={() => setShowDetails(false)}
+                        className="p-1 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05]"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+
                     <div>
-                      <p className="text-[10px] font-medium dash-text-label uppercase tracking-wider mb-2">Customer</p>
-                      <p className="text-xs font-medium dash-text-primary">{selected.name || "Unknown"}</p>
-                      <p className="text-[11px] dash-text-secondary mt-0.5">{selected.phone}</p>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Customer Info</p>
+                      <p className="text-sm font-semibold dash-text-primary">{selected.name || "Unknown"}</p>
+                      <p className="text-xs dash-text-secondary mt-0.5">{selected.phone}</p>
                     </div>
  
                     {selected.payment_status === "pending" && (
-                      <div>
-                        <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
-                        <p className="text-[11px] text-amber-400/80 mb-2">Screenshot received — verify payment</p>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/30 hover:bg-emerald-500/30 transition-all disabled:opacity-50">✓ Verify</button>
-                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50">✗ Reject</button>
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+                        <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Verify Payment</p>
+                        <p className="text-xs dash-text-secondary mb-3">Screenshot received — verify payment</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✓ Verify</button>
+                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✗ Reject</button>
                         </div>
                       </div>
                     )}
  
                     {(selected.payment_status === "verified" || selected.payment_status === "rejected") && (
                       <div>
-                        <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
-                        <span className={`text-[11px] px-2 py-1 rounded-lg border ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
+                        <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Payment Status</p>
+                        <span className={`text-xs px-2.5 py-1.5 rounded-lg border font-semibold inline-block ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
                       </div>
                     )}
  
                     {/* QR Payment Section */}
-                    <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">QR Payment</p>
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">QR Payment</p>
                       <input ref={qrFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleQRFileSelect} />
                       <button
                         onClick={() => handleSendQR()}
                         disabled={sendingQR}
-                        className="w-full py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/30 hover:bg-emerald-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/20"
                       >
                         {sendingQR ? (
-                          <><svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> Sending...</>
+                          <><svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> Sending...</>
                         ) : (
                           <>💳 Send QR Code</>
                         )}
                       </button>
                       {selected.payment_qr_sent && (
-                        <p className="mt-1 text-[10px] text-amber-400/80 text-center">⏳ Waiting for payment screenshot</p>
+                        <p className="mt-2 text-xs font-medium text-amber-400 text-center flex items-center justify-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Waiting for screenshot
+                        </p>
                       )}
                       {business?.qr_image_url ? (
-                        <button onClick={() => qrFileInputRef.current?.click()} className="mt-1 text-[10px] text-white/30 hover:text-white/50 transition-colors w-full text-center">
+                        <button onClick={() => qrFileInputRef.current?.click()} className="mt-2 text-xs dash-text-secondary hover:text-white transition-colors w-full text-center underline decoration-dotted">
                           Change QR Image
                         </button>
                       ) : (
-                        <p className="mt-1 text-[10px] text-white/30 text-center">No QR saved — click above to upload</p>
+                        <p className="mt-2 text-xs dash-text-secondary text-center">No QR saved — click above to upload</p>
                       )}
                     </div>
  
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Tags</p>
-                      <div className="flex flex-wrap gap-1 mb-2">
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Tags</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
                         {(selected.tags ?? []).length === 0 && (
-                          <p className="text-[10px] text-white/20">No tags</p>
+                          <p className="text-xs dash-text-secondary">No tags</p>
                         )}
                         {(selected.tags ?? []).map((tag) => (
-                          <span key={tag} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.07] text-white/60 border border-white/10">
+                          <span key={tag} className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-white/[0.08] text-zinc-200 border border-white/10">
                             {tag}
-                            <button onClick={() => removeTag(tag)} className="text-white/30 hover:text-red-400 transition-colors">×</button>
+                            <button onClick={() => removeTag(tag)} className="text-zinc-400 hover:text-red-400 transition-colors ml-1 font-bold">×</button>
                           </span>
                         ))}
                       </div>
-                      <div className="flex gap-1">
-                        <input
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && addTag()}
-                          placeholder="Add tag..."
-                          className="flex-1 bg-white/[0.05] rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20"
-                        />
-                        <button onClick={addTag} className="px-2.5 rounded-lg bg-white/[0.07] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all text-xs font-medium">+</button>
+                      <div className="flex gap-1.5">
+                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40" />
+                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold">+</button>
                       </div>
                     </div>
  
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Internal Note</p>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Internal Note</p>
                       {selected.internal_note && !noteEditMode ? (
                         // Saved note view
                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-2 mb-1.5">
-                          <p className="text-[11px] text-amber-200/80 whitespace-pre-wrap leading-relaxed">{selected.internal_note}</p>
+                          <p className="text-xs text-amber-200 whitespace-pre-wrap leading-relaxed">{selected.internal_note}</p>
                           <div className="flex gap-1.5 mt-2">
                             <button
                               onClick={() => { setNoteEditMode(true); setNoteInput(selected.internal_note ?? ""); }}
@@ -801,7 +834,7 @@ export default function Dashboard() {
                             onChange={(e) => setNoteInput(e.target.value)}
                             placeholder="Add a private note..."
                             rows={3}
-                            className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none"
+                            className="w-full bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40 resize-none"
                           />
                           <div className="flex gap-1.5 mt-1.5">
                             {noteEditMode && (
@@ -813,7 +846,7 @@ export default function Dashboard() {
                             <button
                               onClick={async () => { await saveNote(); setNoteEditMode(false); }}
                               disabled={savingNote}
-                              className="flex-1 py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all disabled:opacity-50"
+                              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 font-semibold transition-all text-xs disabled:opacity-50"
                             >
                               {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
                             </button>
@@ -823,11 +856,11 @@ export default function Dashboard() {
                     </div>
  
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Usage</p>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">This hour</span><span className="text-white/50">{selected.msg_count_hour ?? 0} msgs</span></div>
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">Today</span><span className="text-white/50">{selected.msg_count_day ?? 0} msgs</span></div>
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">This month</span><span className="text-white/50">{selected.msg_count_month ?? 0} msgs</span></div>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Usage</p>
+                      <div className="space-y-1.5 bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">This hour</span><span className="dash-text-primary font-medium">{selected.msg_count_hour ?? 0} msgs</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">Today</span><span className="dash-text-primary font-medium">{selected.msg_count_day ?? 0} msgs</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">This month</span><span className="dash-text-primary font-medium">{selected.msg_count_month ?? 0} msgs</span></div>
                       </div>
                     </div>
                   </div>
