@@ -13,144 +13,63 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const {
-    name,
-    phone_number_id,
-    whatsapp_number,
-    plan = "basic",
-    ai_model = "openai/gpt-4o-mini",
-    system_prompt,
-    welcome_message,
-  } = await request.json();
-
-  if (!name || !phone_number_id) {
-    return NextResponse.json({ error: "name and phone_number_id are required" }, { status: 400 });
-  }
-
-  // Use the META_SYSTEM_TOKEN stored in Vercel env (server-side, never exposed to client)
+  // Use the META_SYSTEM_TOKEN stored in Vercel env
   const access_token = process.env.META_SYSTEM_TOKEN;
   if (!access_token) {
     return NextResponse.json({ error: "META_SYSTEM_TOKEN not set in env" }, { status: 500 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const { action, phone_number_id, code } = await request.json();
 
-  // Check if already exists
-  const checkRes = await fetch(
-    `${supabaseUrl}/rest/v1/businesses?phone_number_id=eq.${phone_number_id}`,
-    {
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        Accept: "application/json",
-      },
-    }
-  );
-  const existing = await checkRes.json();
-
-  // Get the currently logged in user
-  const { createClient } = require("@/lib/supabase/server");
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (existing && existing.length > 0) {
-    const businessId = existing[0].id;
-    // Update existing
-    const updateRes = await fetch(
-      `${supabaseUrl}/rest/v1/businesses?phone_number_id=eq.${phone_number_id}`,
-      {
-        method: "PATCH",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
-        },
-        body: JSON.stringify({
-          name,
-          access_token,
-          is_active: true,
-          ...(system_prompt && { system_prompt }),
-          ...(welcome_message && { welcome_message }),
-        }),
-      }
-    );
-    const updated = await updateRes.json();
-
-    // Link user profile if user is logged in
-    if (user) {
-      await fetch(`${supabaseUrl}/rest/v1/profiles`, {
-        method: "POST",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-          Prefer: "resolution=merge-duplicates",
-        },
-        body: JSON.stringify({
-          id: user.id,
-          business_id: businessId,
-          name: user.email?.split("@")[0] ?? "Admin",
-          role: "admin",
-        }),
-      });
-    }
-
-    return NextResponse.json({
-      action: "updated",
-      business: updated[0],
-      token_prefix: access_token.substring(0, 20) + "...",
-    });
-  }
-
-  // Insert new
-  const insertRes = await fetch(`${supabaseUrl}/rest/v1/businesses`, {
-    method: "POST",
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify({
-      name,
-      phone_number_id,
-      whatsapp_number: whatsapp_number || null,
-      access_token,
-      is_active: true,
-      plan,
-      ai_model,
-      system_prompt: system_prompt || null,
-      welcome_message: welcome_message || null,
-    }),
-  });
-
-  const inserted = await insertRes.json();
-  const newBusinessId = inserted[0].id;
-
-  // Link user profile if user is logged in
-  if (user) {
-    await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+  if (action === "request_code") {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/request_code`, {
       method: "POST",
       headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+        Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates",
       },
       body: JSON.stringify({
-        id: user.id,
-        business_id: newBusinessId,
-        name: user.email?.split("@")[0] ?? "Admin",
-        role: "admin",
+        code_method: "SMS",
+        language: "en",
       }),
     });
+    const data = await res.json();
+    return NextResponse.json({ action: "request_code", result: data });
   }
 
-  return NextResponse.json({
-    action: "inserted",
-    business: inserted[0],
-    token_prefix: access_token.substring(0, 20) + "...",
-  });
+  if (action === "verify_code") {
+    // 1. Verify code
+    const verifyRes = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/verify_code`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code }),
+    });
+    const verifyData = await verifyRes.json();
+
+    if (verifyData.error) {
+      return NextResponse.json({ action: "verify_code", error: verifyData.error });
+    }
+
+    // 2. Register number
+    const registerRes = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/register`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        pin: "000000",
+      }),
+    });
+    const registerData = await registerRes.json();
+
+    return NextResponse.json({ action: "verify_and_register", verify: verifyData, register: registerData });
+  }
+
+  // --- Normal Business Setup (Already handled previously) ---
+  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 }
