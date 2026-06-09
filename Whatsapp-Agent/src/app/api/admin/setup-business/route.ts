@@ -37,6 +37,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ action: "request_code", result: data });
   }
 
+  if (action === "register") {
+    const registerRes = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/register`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        pin: "123456", // standard 6-digit pin for registration
+      }),
+    });
+    const registerData = await registerRes.json();
+    return NextResponse.json({ action: "register_only", register: registerData });
+  }
+
   if (action === "verify_code") {
     // 1. Verify code
     const verifyRes = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/verify_code`, {
