@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { getAIResponse } from "@/lib/ai";
 import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia, getMediaCategory } from "@/lib/media";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabase = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -77,8 +82,8 @@ export async function POST(request: NextRequest) {
         businessAccessToken = biz.access_token;
         businessApiKey = biz.openrouter_api_key;
         businessModel = biz.ai_model;
-        businessSystemPrompt = biz.system_prompt;
-        businessWelcomeMessage = biz.welcome_message;
+        businessSystemPrompt = biz.system_prompt ? biz.system_prompt.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
+        businessWelcomeMessage = biz.welcome_message ? biz.welcome_message.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
       }
     }
 
@@ -115,16 +120,18 @@ export async function POST(request: NextRequest) {
       if (stored) {
         mediaUrl = stored.publicUrl;
         mediaType = stored.mediaType;
-        // Auto-flag images as potential payment screenshots
+        // SMART PAYMENT DETECTION:
+        // Only flag as payment screenshot if our team sent a QR code first
         if (mediaType === "image") {
-          isPaymentScreenshot = true;
-          // Update payment_status to pending if it's currently 'none'
-          if (conversation.payment_status === "none") {
+          if (conversation.payment_qr_sent) {
+            isPaymentScreenshot = true;
+            // Reset QR flag and mark payment as pending for team verification
             await supabase
               .from("conversations")
-              .update({ payment_status: "pending" })
+              .update({ payment_status: "pending", payment_qr_sent: false })
               .eq("id", conversation.id);
           }
+          // If no QR was sent → treat as a regular image, no payment flag
         }
       }
     } else if (mediaId && !businessAccessToken) {
@@ -133,10 +140,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Store user message (ignore duplicates)
+    const storedText = isPaymentScreenshot && text === "[image]" ? "[Payment Screenshot]" : text;
+    
     const { error: insertError } = await supabase.from("messages").insert({
       conversation_id: conversation.id,
       role: "user",
-      content: text,
+      content: storedText,
       whatsapp_msg_id: whatsappMsgId,
       media_url: mediaUrl,
       media_type: mediaType,
@@ -158,10 +167,42 @@ export async function POST(request: NextRequest) {
       return Response.json({ status: "stored_for_human" });
     }
 
+    // DETERMINISTIC MEDIA HANDLING
+    // If the user sent media with NO caption, we bypass the AI completely
+    // to ensure 100% accurate responses and save API costs.
+    if (mediaType && text === `[${msgType}]`) {
+      let replyText = "Thank you for sharing your file. Our team will get back to you shortly 💛";
+
+      if (msgType === "image") {
+        replyText = isPaymentScreenshot
+          ? "Thank you for the payment screenshot! 🙏 Our team will verify and confirm shortly 💛"
+          : "Thank you for sending! 📩 We have received your image. Our team will get back to you shortly 💛";
+      } else if (msgType === "audio") {
+        replyText = "Thank you for your voice note! 🎤 Our team will listen and get back to you shortly 💛";
+      } else if (msgType === "document") {
+        replyText = "Thank you for sending the document! 📄 Our team will review it and get back to you shortly 💛";
+      } else if (msgType === "video") {
+        replyText = "Thank you for the video! 🎥 Our team will take a look and get back to you shortly 💛";
+      }
+
+      await sendWhatsAppMessage(phone, replyText, {
+        phoneNumberId: incomingPhoneNumberId,
+        accessToken: businessAccessToken ?? undefined,
+      });
+
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: replyText,
+      });
+
+      return Response.json({ status: "replied_media_auto" });
+    }
+
     // Fetch conversation history (last 20 messages for context)
     const { data: historyData } = await supabase
       .from("messages")
-      .select("role, content")
+      .select("role, content, media_type, is_payment_screenshot")
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -170,9 +211,10 @@ export async function POST(request: NextRequest) {
 
     // Send fixed welcome message for first message
     if (conversation.is_first_message) {
+      // Use the client's custom message, or a generic fallback for new clients
       const welcomeMsg =
         businessWelcomeMessage ??
-        `Hey! 👋 Welcome to Cenexa Systems — I'm Cera, your AI assistant.\n\nWe help businesses grow with smart tech — WhatsApp bots, websites, custom software, and automation.\n\nWhat can I help you with today? 😊`;
+        `Hey! 👋 I'm your AI assistant. How can I help you today? 😊`;
 
       await sendWhatsAppMessage(phone, welcomeMsg, {
         phoneNumberId: incomingPhoneNumberId,
@@ -209,15 +251,43 @@ export async function POST(request: NextRequest) {
     }
 
     // Call AI with per-business overrides
-    const { reply, error } = await getAIResponse(
-      (history || []).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+    let { reply, error } = await getAIResponse(
+      (history || []).map((m) => {
+        let aiContent = m.content;
+        // Inject explicit context for the AI if it's an image with a caption
+        if (m.media_type === "image" && m.role === "user") {
+          if (m.is_payment_screenshot) {
+             aiContent = `[System Note: User attached a Payment Screenshot] ${m.content}`;
+          } else {
+             aiContent = `[System Note: User attached a General Image] ${m.content}`;
+          }
+        }
+        return {
+          role: m.role as "user" | "assistant",
+          content: aiContent,
+        };
+      }),
       businessSystemPrompt ?? undefined,
       businessApiKey ?? undefined,
       businessModel ?? undefined
     );
+
+    // WhatsApp does not support markdown links [text](url).
+    // Convert them to plain text so they are clickable: "text: url"
+    if (reply) {
+      reply = reply.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "$1: $2");
+    }
+
+    // --- SMART PAYMENT AUTO-DETECTION ---
+    // If the AI autonomously asks the user to pay and send a screenshot,
+    // we automatically flip the payment_qr_sent switch so the next image is treated as a payment!
+    let setPaymentQrSent = false;
+    if (reply) {
+      const lowerReply = reply.toLowerCase();
+      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("98405") || lowerReply.includes("pay"))) {
+        setPaymentQrSent = true;
+      }
+    }
 
     // If AI failed — switch to human mode automatically
     if (error) {
@@ -225,10 +295,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Always send a reply — either AI or fallback
-    await sendWhatsAppMessage(phone, reply, {
+    const waResult = await sendWhatsAppMessage(phone, reply, {
       phoneNumberId: incomingPhoneNumberId,
       accessToken: businessAccessToken ?? undefined,
     });
+
+    if (waResult.error) {
+      // Store the error message in the dashboard so we can debug it
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: `❌ WHATSAPP API ERROR: ${JSON.stringify(waResult.error)}`,
+      });
+      return Response.json({ status: "whatsapp_api_error" });
+    }
 
     // Store AI response
     await supabase.from("messages").insert({
@@ -237,10 +317,15 @@ export async function POST(request: NextRequest) {
       content: reply,
     });
 
-    // Update conversation timestamp again
+    // Update conversation timestamp (and payment flag if needed)
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (setPaymentQrSent) {
+      updatePayload.payment_qr_sent = true;
+    }
+
     await supabase
       .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", conversation.id);
 
     return Response.json({ status: "replied" });
@@ -249,3 +334,4 @@ export async function POST(request: NextRequest) {
     return Response.json({ status: "error" }, { status: 500 });
   }
 }
+

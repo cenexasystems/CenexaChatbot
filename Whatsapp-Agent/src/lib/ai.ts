@@ -2,10 +2,27 @@ import OpenAI from "openai";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 
 const FALLBACK_REPLIES = [
-  "Sorry, I'm having a small technical issue right now! Please try again in a moment, or call us directly at +91 99949 81576. 🙏",
-  "Oops, something went wrong on my end! Our team is always available at +91 99949 81576 or cenexasystems@gmail.com 😊",
-  "I ran into a quick issue there! Give me a moment — or reach us directly at +91 99949 81576 for immediate help. 📞",
+  "Sorry, I'm having a small technical issue right now! Please try again in a moment. 🙏",
+  "Oops, something went wrong on my end! Our team is always available. 😊",
+  "I ran into a quick issue there! Give me a moment for immediate help. 📞",
 ];
+
+// This forces the AI to reply correctly to media uploads
+const MEDIA_INSTRUCTIONS = `
+IMPORTANT RULES FOR MEDIA:
+- If the user sends "[image]" or "[document]" without text, assume it is a payment screenshot and reply exactly with: "Thank you for the screenshot! Our team will verify your payment shortly."
+- If the user sends "[audio]" or "[video]", reply with: "Thank you for sharing your file. We've received it and our team will take a look shortly. While the review is in progress, please note that I can currently assist with text messages only."
+- NEVER ask the user to summarize a document or image.
+`;
+
+const WEBSITE_INSTRUCTIONS = `
+IMPORTANT RULES FOR WEBSITE LINKS (B2 Bridal Studio):
+- To know about the studio: b2bridalstudio.com/about
+- For services: b2bridalstudio.com/services
+- To know about previous works/gallery: b2bridalstudio.com/gallery
+- To view courses: b2bridalstudio.com/courses
+Always try to use these exact links when the user asks for related information.
+`;
 
 export async function getAIResponse(
   messages: { role: "user" | "assistant"; content: string }[],
@@ -19,10 +36,12 @@ export async function getAIResponse(
       apiKey: apiKeyOverride ?? process.env.OPENROUTER_API_KEY ?? "",
     });
 
+    const finalSystemPrompt = (systemPromptOverride ?? SYSTEM_PROMPT) + "\n\n" + MEDIA_INSTRUCTIONS + "\n\n" + WEBSITE_INSTRUCTIONS;
+
     const completion = await openai.chat.completions.create({
       model: modelOverride ?? process.env.AI_MODEL ?? "openai/gpt-4o-mini",
       messages: [
-        { role: "system" as const, content: systemPromptOverride ?? SYSTEM_PROMPT },
+        { role: "system" as const, content: finalSystemPrompt },
         ...messages.map((m) => ({
           role: m.role as "user" | "assistant",
           content: m.content,

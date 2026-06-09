@@ -1,132 +1,217 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get("code");
-  const state = searchParams.get("state"); // business_id passed via state param
-
-  if (!code) {
-    return NextResponse.json({ error: "Missing code parameter" }, { status: 400 });
-  }
-
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cenexa-chatbot.vercel.app";
-  const redirectUri = `${appUrl}/api/onboard/callback`;
-
-  if (!appId || !appSecret) {
-    console.error("Missing META_APP_ID or META_APP_SECRET env vars");
-    return NextResponse.json({ error: "Server misconfiguration: missing Meta app credentials" }, { status: 500 });
-  }
-
+/**
+ * POST /api/onboard/callback
+ */
+export async function POST(request: NextRequest) {
   try {
-    // Step 1: Exchange code for access token
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}`;
+    const { code, businessName } = await request.json();
 
-    const tokenRes = await fetch(tokenUrl);
+    if (!code) {
+      return NextResponse.json({ error: "Missing authorization code" }, { status: 400 });
+    }
+    if (!businessName || !businessName.trim()) {
+      return NextResponse.json({ error: "Business name is required" }, { status: 400 });
+    }
+
+    // ── 1. Get the authenticated Supabase user ─────────────────────────────
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // ── 2. Exchange code for access token ──────────────────────────────────
+    const appId = process.env.META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+
+    if (!appId || !appSecret) {
+      return NextResponse.json(
+        { error: "Meta app credentials not configured. Set META_APP_ID and META_APP_SECRET." },
+        { status: 500 }
+      );
+    }
+
+    const tokenUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
+    tokenUrl.searchParams.set("client_id", appId);
+    tokenUrl.searchParams.set("client_secret", appSecret);
+    tokenUrl.searchParams.set("code", code);
+    // FB.login() JS SDK flow: redirect_uri MUST NOT be included.
+
+    const tokenRes = await fetch(tokenUrl.toString());
     const tokenData = await tokenRes.json();
 
-    // --- REQUESTED DEBUG LOG ---
     console.log("Token response:", JSON.stringify(tokenData, null, 2));
 
-    if (tokenData.error) {
-      console.error("Token exchange failed:", tokenData.error);
+    if (!tokenRes.ok || tokenData.error || !tokenData.access_token) {
+      console.error("[onboard/callback] Token exchange failed:", tokenData);
       return NextResponse.json(
-        { error: "Token exchange failed", detail: tokenData.error },
+        { error: tokenData?.error?.message ?? "Failed to exchange token with Meta" },
         { status: 400 }
       );
     }
 
-    const userAccessToken = tokenData.access_token;
+    const accessToken: string = tokenData.access_token;
 
-    // Step 2: Debug the token to extract granular_scopes (WABA ID)
-    const debugUrl = `https://graph.facebook.com/v19.0/debug_token?input_token=${userAccessToken}&access_token=${appId}|${appSecret}`;
-
+    // ── 3. Find WABA ID via debug_token endpoint ──────────────────────────
+    const debugUrl = `https://graph.facebook.com/v19.0/debug_token?input_token=${accessToken}&access_token=${appId}|${appSecret}`;
     const debugRes = await fetch(debugUrl);
-    const debugJson = await debugRes.json();
-    const debugData = debugJson.data;
+    const debugData = await debugRes.json();
 
-    // --- REQUESTED DEBUG LOG ---
     console.log("Debug token info:", JSON.stringify(debugData, null, 2));
 
-    // Step 3: Extract WABA ID from granular_scopes
-    const granularScopes: Array<{ scope: string; target_ids?: string[] }> =
-      debugData?.granular_scopes || [];
-
-    console.log("Granular scopes:", JSON.stringify(granularScopes, null, 2));
-
-    const wabScope = granularScopes.find(
-      (s) => s.scope === "whatsapp_business_management"
-    );
-
-    if (!wabScope || !wabScope.target_ids || wabScope.target_ids.length === 0) {
-      console.error(
-        "No WhatsApp Business Account found in the token scopes. granular_scopes:",
-        JSON.stringify(granularScopes, null, 2)
+    if (!debugRes.ok || debugData.error || !debugData.data) {
+      console.error("[onboard/callback] Debug token failed:", debugData);
+      return NextResponse.json(
+        { error: debugData?.error?.message ?? "Failed to validate token permissions" },
+        { status: 400 }
       );
+    }
+
+    let wabaId: string | null = null;
+    const granularScopes = debugData.data.granular_scopes ?? [];
+
+    for (const scope of granularScopes) {
+      if (scope.scope === "whatsapp_business_management" && scope.target_ids && scope.target_ids.length > 0) {
+        wabaId = scope.target_ids[0];
+        break;
+      }
+    }
+
+    if (!wabaId) {
+      return NextResponse.json(
+        { error: "No WhatsApp Business Account found in the token scopes. Did you complete the signup?" },
+        { status: 400 }
+      );
+    }
+
+    // ── 4. Fetch the phone numbers for this specific WABA ─────────────────
+    const wabaPhonesRes = await fetch(
+      `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+    );
+    const wabaPhonesData = await wabaPhonesRes.json();
+
+    if (!wabaPhonesRes.ok || wabaPhonesData.error) {
+      console.error("[onboard/callback] WABA phone numbers fetch failed:", wabaPhonesData);
+      return NextResponse.json(
+        { error: wabaPhonesData?.error?.message ?? "Failed to fetch phone numbers for the account" },
+        { status: 400 }
+      );
+    }
+
+    let phoneNumberId: string | null = null;
+    let whatsappNumber: string | null = null;
+    
+    const phone = wabaPhonesData.data?.[0];
+    if (phone?.id) {
+      phoneNumberId = phone.id;
+      whatsappNumber = phone.display_phone_number ?? null;
+    }
+
+    if (!phoneNumberId) {
       return NextResponse.json(
         {
-          error: "No WhatsApp Business Account found in the token scopes",
-          granular_scopes: granularScopes,
+          error:
+            "No WhatsApp phone number found in your account. Please ensure you completed the signup and added a number.",
         },
         { status: 400 }
       );
     }
 
-    const wabaId = wabScope.target_ids[0];
-    console.log("Extracted WABA ID:", wabaId);
-
-    // Step 4: Get phone numbers under this WABA
-    const phonesRes = await fetch(
-      `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${userAccessToken}`
-    );
-    const phonesData = await phonesRes.json();
-    console.log("Phone numbers response:", JSON.stringify(phonesData, null, 2));
-
-    const phoneNumberId = phonesData?.data?.[0]?.id;
-
-    // Step 5: Get a long-lived System User token OR store the user token
-    // For now, store the user token (business should generate a permanent system user token later)
-
-    // Step 6: Update or create the business record in Supabase
-    if (state) {
-      // Update existing business record
-      const { error: updateError } = await supabase
-        .from("businesses")
-        .update({
-          waba_id: wabaId,
-          access_token: userAccessToken,
-          phone_number_id: phoneNumberId || null,
-          is_active: true,
-        })
-        .eq("id", state);
-
-      if (updateError) {
-        console.error("Supabase update error:", updateError);
-        return NextResponse.json({ error: "Database update failed" }, { status: 500 });
-      }
-
-      console.log("Business updated successfully:", state);
-    } else {
-      // No state — just return the data for the frontend to handle
-      return NextResponse.json({
-        success: true,
-        waba_id: wabaId,
-        phone_number_id: phoneNumberId,
-        access_token: userAccessToken,
-        message: "WhatsApp Business Account connected successfully",
+    // ── 5. Register the phone number with the Cloud API ───────────────────
+    try {
+      await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/register`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          pin: "000000",
+        }),
       });
+    } catch (regErr) {
+      console.warn("[onboard/callback] Register step warning:", regErr);
     }
 
-    // Redirect to the main dashboard with success message
-    const dashboardUrl = new URL(appUrl);
-    dashboardUrl.searchParams.set("onboard_success", "1");
-    dashboardUrl.searchParams.set("waba_id", wabaId);
+    // ── 6. Write to Supabase using the service role (bypasses RLS) ────────
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    return NextResponse.redirect(dashboardUrl.toString());
+    const { data: existingBusiness } = await adminClient
+      .from("businesses")
+      .select("id")
+      .eq("phone_number_id", phoneNumberId)
+      .single();
+
+    let businessId: string;
+
+    if (existingBusiness) {
+      businessId = existingBusiness.id;
+      await adminClient
+        .from("businesses")
+        .update({ access_token: accessToken, is_active: true, name: businessName.trim() })
+        .eq("id", businessId);
+    } else {
+      const { data: newBusiness, error: insertError } = await adminClient
+        .from("businesses")
+        .insert({
+          name: businessName.trim(),
+          phone_number_id: phoneNumberId,
+          whatsapp_number: whatsappNumber,
+          access_token: accessToken,
+          is_active: true,
+          plan: "basic",
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !newBusiness) {
+        console.error("[onboard/callback] Business insert error:", insertError);
+        return NextResponse.json(
+          { error: "Failed to save business to database" },
+          { status: 500 }
+        );
+      }
+
+      businessId = newBusiness.id;
+    }
+
+    const { error: profileError } = await adminClient.from("profiles").upsert(
+      {
+        id: user.id,
+        business_id: businessId,
+        name: user.email?.split("@")[0] ?? "Admin",
+        role: "admin",
+      },
+      { onConflict: "id" }
+    );
+
+    if (profileError) {
+      console.error("[onboard/callback] Profile upsert error:", profileError);
+      return NextResponse.json({ error: "Failed to link profile to business" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      businessId,
+      phoneNumberId,
+      whatsappNumber,
+    });
   } catch (err) {
-    console.error("Onboard callback error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[onboard/callback] Unexpected error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal server error" },
+      { status: 500 }
+    );
   }
 }

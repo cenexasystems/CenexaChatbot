@@ -36,13 +36,34 @@ export default function Dashboard() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // Persist theme in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("dash-theme") as "dark" | "light" | null;
+    if (saved) setTheme(saved);
+  }, []);
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("dash-theme", next);
+  }
   const [tagInput, setTagInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [noteEditMode, setNoteEditMode] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [view, setView] = useState<"list" | "chat">("list");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [sendingImage, setSendingImage] = useState(false);
+  const [sendingQR, setSendingQR] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
  
   const selected = conversations.find((c) => c.id === selectedId);
  
@@ -164,7 +185,108 @@ export default function Dashboard() {
     setSending(false);
     fetchMessages(selectedId);
   }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function cancelImagePreview() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleSendImage() {
+    if (!imageFile || !selectedId || sendingImage) return;
+    setSendingImage(true);
+    try {
+      // Upload to Supabase Storage bucket "media"
+      const fileName = `qr-codes/${Date.now()}-${imageFile.name.replace(/\s/g, "_")}`;
+      const { error: uploadError } = await supabase!
+        .storage
+        .from("media")
+        .upload(fileName, imageFile, { contentType: imageFile.type, upsert: false });
+
+      if (uploadError) {
+        console.error("Upload failed:", uploadError.message);
+        alert("Upload failed: " + uploadError.message);
+        setSendingImage(false);
+        return;
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase!
+        .storage
+        .from("media")
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Send image via WhatsApp API
+      await fetch(`/api/conversations/${selectedId}/send-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: publicUrl, caption: input.trim() }),
+      });
+
+      // Clear state
+      cancelImagePreview();
+      setInput("");
+      fetchMessages(selectedId);
+    } catch (err) {
+      console.error("Send image error:", err);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setSendingImage(false);
+    }
+  }
  
+  async function handleSendQR(uploadedUrl?: string) {
+    if (!selectedId || sendingQR) return;
+    const qrUrl = uploadedUrl || business?.qr_image_url;
+    if (!qrUrl) {
+      // No QR stored yet — open file picker to upload first
+      qrFileInputRef.current?.click();
+      return;
+    }
+    setSendingQR(true);
+    const res = await fetch(`/api/conversations/${selectedId}/send-qr`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: qrUrl }),
+    });
+    const data = await res.json();
+    if (data.error) alert(data.error);
+    setSendingQR(false);
+    fetchMessages(selectedId);
+  }
+
+  async function handleQRFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedId) return;
+    setSendingQR(true);
+    try {
+      const fileName = `qr-codes/business-qr-${Date.now()}.${file.name.split(".").pop()}`;
+      const { error: uploadError } = await supabase!
+        .storage
+        .from("media")
+        .upload(fileName, file, { contentType: file.type, upsert: true });
+      if (uploadError) { alert("Upload failed: " + uploadError.message); return; }
+      const { data: urlData } = supabase!.storage.from("media").getPublicUrl(fileName);
+      await handleSendQR(urlData.publicUrl);
+      // Update business in local state so button works instantly next time
+      if (business) setBusiness({ ...business, qr_image_url: urlData.publicUrl });
+    } finally {
+      if (qrFileInputRef.current) qrFileInputRef.current.value = "";
+      setSendingQR(false);
+    }
+  }
+
   async function handleVerifyPayment(action: "approve" | "reject") {
     if (!selectedId) return;
     setVerifyingPayment(true);
@@ -201,13 +323,23 @@ export default function Dashboard() {
   }
  
   async function saveNote() {
-    if (!selected) return;
-    await fetch(`/api/conversations/${selected.id}`, {
+    if (!selected || savingNote) return;
+    setSavingNote(true);
+    setNoteSaved(false);
+    const res = await fetch(`/api/conversations/${selected.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
       body: JSON.stringify({ internal_note: noteInput }),
     });
-    setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: noteInput } : c));
+    setSavingNote(false);
+    if (res.ok) {
+      setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: noteInput } : c));
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 2000);
+    }
   }
  
   function formatTime(dateStr: string) {
@@ -267,16 +399,16 @@ export default function Dashboard() {
   }
  
   return (
-    <div className="flex h-screen bg-[#0f0f0f] font-sans overflow-hidden">
+    <div className={`flex h-screen font-sans overflow-hidden dash-bg ${theme === "light" ? "dashboard-light" : ""}`}>
  
       {/* ── SIDEBAR ── */}
       <div className={`
         ${view === "chat" ? "hidden md:flex" : "flex"}
-        w-full md:w-[300px] flex-col border-r border-white/[0.06] flex-shrink-0
-      `} style={{ background: "#141414" }}>
+        w-full md:w-[300px] flex-col border-r dash-border flex-shrink-0 dash-sidebar
+      `}>
  
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/[0.06]">
+        <div className="px-4 py-3 border-b dash-border">
           {showSearch ? (
             <div className="flex items-center gap-2">
               <button onClick={() => { setShowSearch(false); setSearch(""); }} className="p-1.5 text-white/50 hover:text-white transition-colors flex-shrink-0">
@@ -308,17 +440,30 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-xs font-semibold text-white leading-tight truncate max-w-[140px]">{business?.name || "WhatsApp CRM"}</h1>
+                  <h1 className="text-xs font-semibold dash-text-primary leading-tight truncate max-w-[140px]">{business?.name || "WhatsApp CRM"}</h1>
                   <p className="text-[10px] text-white/40">{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setShowSearch(true)} className="p-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Search">
+                {/* Theme toggle */}
+                <button onClick={toggleTheme} className="p-2 rounded-lg dash-text-secondary hover:bg-white/[0.05] transition-all" title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+                  {theme === "dark" ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                  )}
+                </button>
+                <button onClick={() => setShowSearch(true)} className="p-2 rounded-lg dash-text-secondary hover:bg-white/[0.05] transition-all" title="Search">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </button>
-                <button onClick={handleLogout} className="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/[0.05] transition-all" title="Logout">
+
+                <button onClick={handleLogout} className="w-[44px] h-[44px] rounded hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-red-400 transition-all" title="Logout">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
@@ -355,7 +500,18 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-medium text-white/90 truncate">{convo.name || convo.phone}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-medium text-white/90 truncate">{convo.name || convo.phone}</span>
+                        {convo.payment_status && convo.payment_status !== "none" && (
+                          <span className={`text-[8px] px-1 py-0.2 rounded font-bold flex-shrink-0 border uppercase tracking-wider ${
+                            convo.payment_status === "verified" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
+                            convo.payment_status === "pending" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                            "bg-red-500/20 text-red-400 border-red-500/30"
+                          }`}>
+                            {convo.payment_status}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-white/30 flex-shrink-0">{formatTime(convo.updated_at)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -366,7 +522,6 @@ export default function Dashboard() {
                          convo.last_message || ""}
                       </p>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {convo.payment_status === "pending" && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${convo.mode === "agent" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
                           {convo.mode === "agent" ? "AI" : "You"}
                         </span>
@@ -400,7 +555,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0" style={{ background: "#141414" }}>
+            <div className="px-4 py-3 border-b dash-border flex items-center justify-between flex-shrink-0 dash-sidebar">
               <div className="flex items-center gap-2.5 min-w-0">
                 {/* Back button — mobile only */}
                 <button
@@ -415,8 +570,8 @@ export default function Dashboard() {
                   {getInitials(selected.name, selected.phone)}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-xs font-semibold text-white leading-tight truncate">{selected.name || selected.phone}</h2>
-                  <p className="text-[10px] text-white/40 leading-tight">{selected.phone}</p>
+                  <h2 className="text-xs font-semibold dash-text-primary leading-tight truncate">{selected.name || selected.phone}</h2>
+                  <p className="text-[10px] dash-text-secondary leading-tight">{selected.phone}</p>
                 </div>
                 {selected.payment_status !== "none" && (
                   <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ml-1 hidden sm:inline ${PAYMENT_COLORS[selected.payment_status]}`}>
@@ -425,7 +580,7 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button onClick={() => setShowDetails((v) => !v)} className="hidden md:flex p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Toggle details">
+                <button onClick={() => setShowDetails((v) => !v)} className="flex p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all" title="Toggle details">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
                   </svg>
@@ -442,14 +597,14 @@ export default function Dashboard() {
             <div className="flex-1 flex min-h-0">
               {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg">
                   {messages.map((msg, i) => {
                     const isUser = msg.role === "user";
                     const showTime = i === messages.length - 1 || messages[i + 1]?.role !== msg.role;
                     return (
                       <div key={msg.id} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
                         <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%]`}>
-                          <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "bg-white/[0.07] text-white/90 rounded-tl-sm border border-white/[0.06]" : "bg-emerald-600 text-white rounded-tr-sm"}`}>
+                          <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "dash-msg-user rounded-tl-sm border" : "dash-msg-ai rounded-tr-sm"}`}>
                             {renderMessageContent(msg)}
                           </div>
                           {showTime && (
@@ -466,87 +621,246 @@ export default function Dashboard() {
                 </div>
  
                 {/* Input */}
-                <div className="px-4 py-3 border-t border-white/[0.06] flex-shrink-0" style={{ background: "#141414", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+                <div className="px-4 py-3 border-t dash-border flex-shrink-0 dash-sidebar" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+                  {/* Image Preview */}
+                  {imagePreview && (
+                    <div className="mb-2.5 flex items-center gap-2 bg-white/[0.04] rounded-xl px-3 py-2 border border-white/[0.06]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imagePreview} alt="Preview" className="w-12 h-12 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] text-white/60 truncate">{imageFile?.name}</p>
+                        <p className="text-[10px] text-white/30">Ready to send</p>
+                      </div>
+                      <button onClick={cancelImagePreview} className="p-1 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.05] transition-all flex-shrink-0">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2.5 bg-white/[0.06] rounded-xl px-3.5 py-2.5 border border-white/[0.06] focus-within:border-emerald-500/40 transition-colors">
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                    {/* Paperclip / Image button */}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Send image"
+                      className="text-white/30 hover:text-emerald-400 transition-colors flex-shrink-0"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </button>
                     <input
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                      placeholder="Type a message..."
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (imagePreview ? handleSendImage() : handleSend())}
+                      placeholder={imagePreview ? "Add a caption (optional)..." : "Type a message..."}
                       className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25 focus:outline-none"
                     />
-                    <button onClick={handleSend} disabled={sending || !input.trim()} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
-                      {sending ? (
-                        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                        </svg>
-                      ) : (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                        </svg>
-                      )}
-                    </button>
+                    {imagePreview ? (
+                      <button onClick={handleSendImage} disabled={sendingImage} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
+                        {sendingImage ? (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                          </svg>
+                        )}
+                      </button>
+                    ) : (
+                      <button onClick={handleSend} disabled={sending || !input.trim()} className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0">
+                        {sending ? (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
  
-              {/* ── RIGHT DETAILS PANEL — desktop only ── */}
+              {/* Mobile details backdrop overlay */}
               {showDetails && (
-                <div className="hidden md:flex w-[240px] border-l border-white/[0.06] flex-col overflow-y-auto flex-shrink-0" style={{ background: "#141414" }}>
+                <div 
+                  className="fixed inset-0 bg-black/60 z-30 md:hidden transition-opacity duration-300"
+                  onClick={() => setShowDetails(false)}
+                />
+              )}
+
+              {/* ── RIGHT DETAILS PANEL ── */}
+              {showDetails && (
+                <div className={`
+                  fixed inset-y-0 right-0 z-40 w-[280px] sm:w-[320px] md:relative md:w-[240px] md:z-0
+                  border-l dash-border flex flex-col overflow-y-auto flex-shrink-0 shadow-2xl md:shadow-none
+                  transition-all duration-300 ease-in-out dash-sidebar
+                `}>
                   <div className="p-4 space-y-5">
+                    {/* Mobile Close Header */}
+                    <div className="flex md:hidden items-center justify-between pb-3 border-b dash-border mb-2">
+                      <span className="text-sm font-bold dash-text-primary">Customer Details</span>
+                      <button 
+                        onClick={() => setShowDetails(false)}
+                        className="p-1 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.05]"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Customer</p>
-                      <p className="text-xs font-medium text-white/80">{selected.name || "Unknown"}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">{selected.phone}</p>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Customer Info</p>
+                      <p className="text-sm font-semibold dash-text-primary">{selected.name || "Unknown"}</p>
+                      <p className="text-xs dash-text-secondary mt-0.5">{selected.phone}</p>
                     </div>
  
                     {selected.payment_status === "pending" && (
-                      <div>
-                        <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
-                        <p className="text-[11px] text-amber-400/80 mb-2">Screenshot received — verify payment</p>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/30 hover:bg-emerald-500/30 transition-all disabled:opacity-50">✓ Verify</button>
-                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50">✗ Reject</button>
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+                        <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Verify Payment</p>
+                        <p className="text-xs dash-text-secondary mb-3">Screenshot received — verify payment</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✓ Verify</button>
+                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✗ Reject</button>
                         </div>
                       </div>
                     )}
  
                     {(selected.payment_status === "verified" || selected.payment_status === "rejected") && (
                       <div>
-                        <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Payment</p>
-                        <span className={`text-[11px] px-2 py-1 rounded-lg border ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
+                        <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Payment Status</p>
+                        <span className={`text-xs px-2.5 py-1.5 rounded-lg border font-semibold inline-block ${PAYMENT_COLORS[selected.payment_status]}`}>{PAYMENT_LABELS[selected.payment_status]}</span>
                       </div>
                     )}
  
+                    {/* QR Payment Section */}
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">QR Payment</p>
+                      <input ref={qrFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleQRFileSelect} />
+                      <button
+                        onClick={() => handleSendQR()}
+                        disabled={sendingQR}
+                        className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/20"
+                      >
+                        {sendingQR ? (
+                          <><svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> Sending...</>
+                        ) : (
+                          <>💳 Send QR Code</>
+                        )}
+                      </button>
+                      {selected.payment_qr_sent && (
+                        <p className="mt-2 text-xs font-medium text-amber-400 text-center flex items-center justify-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Waiting for screenshot
+                        </p>
+                      )}
+                      {business?.qr_image_url ? (
+                        <button onClick={() => qrFileInputRef.current?.click()} className="mt-2 text-xs dash-text-secondary hover:text-white transition-colors w-full text-center underline decoration-dotted">
+                          Change QR Image
+                        </button>
+                      ) : (
+                        <p className="mt-2 text-xs dash-text-secondary text-center">No QR saved — click above to upload</p>
+                      )}
+                    </div>
+ 
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Tags</p>
-                      <div className="flex flex-wrap gap-1 mb-2">
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Tags</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {(selected.tags ?? []).length === 0 && (
+                          <p className="text-xs dash-text-secondary">No tags</p>
+                        )}
                         {(selected.tags ?? []).map((tag) => (
-                          <span key={tag} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.07] text-white/60 border border-white/10">
+                          <span key={tag} className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-white/[0.08] text-zinc-200 border border-white/10">
                             {tag}
-                            <button onClick={() => removeTag(tag)} className="text-white/30 hover:text-white/60 transition-colors">×</button>
+                            <button onClick={() => removeTag(tag)} className="text-zinc-400 hover:text-red-400 transition-colors ml-1 font-bold">×</button>
                           </span>
                         ))}
                       </div>
-                      <div className="flex gap-1">
-                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.05] rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20" />
-                        <button onClick={addTag} className="px-2 rounded-lg bg-white/[0.07] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all text-xs">+</button>
+                      <div className="flex gap-1.5">
+                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40" />
+                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold">+</button>
                       </div>
                     </div>
  
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Internal Note</p>
-                      <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="Add a private note..." rows={3} className="w-full bg-white/[0.05] rounded-lg px-2.5 py-2 text-[11px] text-white/80 placeholder:text-white/25 border border-white/[0.06] focus:outline-none focus:border-white/20 resize-none" />
-                      <button onClick={saveNote} className="mt-1.5 w-full py-1.5 rounded-lg bg-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.10] border border-white/[0.06] transition-all">Save Note</button>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Internal Note</p>
+                      {selected.internal_note && !noteEditMode ? (
+                        // Saved note view
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-2 mb-1.5">
+                          <p className="text-xs text-amber-200 whitespace-pre-wrap leading-relaxed">{selected.internal_note}</p>
+                          <div className="flex gap-1.5 mt-2">
+                            <button
+                              onClick={() => { setNoteEditMode(true); setNoteInput(selected.internal_note ?? ""); }}
+                              className="flex-1 py-1 rounded-md bg-white/[0.07] text-[10px] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all"
+                            >✏️ Edit</button>
+                            <button
+                              onClick={async () => {
+                                setNoteInput("");
+                                setSavingNote(true);
+                                await fetch(`/api/conversations/${selected.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json", ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+                                  body: JSON.stringify({ internal_note: "" }),
+                                });
+                                setSavingNote(false);
+                                setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: "" } : c));
+                              }}
+                              className="flex-1 py-1 rounded-md bg-red-500/10 text-[10px] text-red-400/70 hover:text-red-400 border border-red-500/20 transition-all"
+                            >🗑️ Delete</button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Edit / new note view
+                        <>
+                          <textarea
+                            value={noteInput}
+                            onChange={(e) => setNoteInput(e.target.value)}
+                            placeholder="Add a private note..."
+                            rows={3}
+                            className="w-full bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40 resize-none"
+                          />
+                          <div className="flex gap-1.5 mt-1.5">
+                            {noteEditMode && (
+                              <button
+                                onClick={() => setNoteEditMode(false)}
+                                className="flex-1 py-1.5 rounded-lg bg-white/[0.05] text-[11px] text-white/30 hover:text-white/60 border border-white/[0.06] transition-all"
+                              >Cancel</button>
+                            )}
+                            <button
+                              onClick={async () => { await saveNote(); setNoteEditMode(false); }}
+                              disabled={savingNote}
+                              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 font-semibold transition-all text-xs disabled:opacity-50"
+                            >
+                              {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
  
                     <div>
-                      <p className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-2">Usage</p>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">This hour</span><span className="text-white/50">{selected.msg_count_hour ?? 0} msgs</span></div>
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">Today</span><span className="text-white/50">{selected.msg_count_day ?? 0} msgs</span></div>
-                        <div className="flex justify-between text-[10px]"><span className="text-white/30">This month</span><span className="text-white/50">{selected.msg_count_month ?? 0} msgs</span></div>
+                      <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Usage</p>
+                      <div className="space-y-1.5 bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">This hour</span><span className="dash-text-primary font-medium">{selected.msg_count_hour ?? 0} msgs</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">Today</span><span className="dash-text-primary font-medium">{selected.msg_count_day ?? 0} msgs</span></div>
+                        <div className="flex justify-between text-xs"><span className="text-zinc-400">This month</span><span className="dash-text-primary font-medium">{selected.msg_count_month ?? 0} msgs</span></div>
                       </div>
                     </div>
                   </div>
@@ -559,3 +873,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
