@@ -49,7 +49,13 @@ export async function POST(request: NextRequest) {
   );
   const existing = await checkRes.json();
 
+  // Get the currently logged in user
+  const { createClient } = require("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   if (existing && existing.length > 0) {
+    const businessId = existing[0].id;
     // Update existing
     const updateRes = await fetch(
       `${supabaseUrl}/rest/v1/businesses?phone_number_id=eq.${phone_number_id}`,
@@ -71,6 +77,26 @@ export async function POST(request: NextRequest) {
       }
     );
     const updated = await updateRes.json();
+
+    // Link user profile if user is logged in
+    if (user) {
+      await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          id: user.id,
+          business_id: businessId,
+          name: user.email?.split("@")[0] ?? "Admin",
+          role: "admin",
+        }),
+      });
+    }
+
     return NextResponse.json({
       action: "updated",
       business: updated[0],
@@ -101,6 +127,27 @@ export async function POST(request: NextRequest) {
   });
 
   const inserted = await insertRes.json();
+  const newBusinessId = inserted[0].id;
+
+  // Link user profile if user is logged in
+  if (user) {
+    await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        id: user.id,
+        business_id: newBusinessId,
+        name: user.email?.split("@")[0] ?? "Admin",
+        role: "admin",
+      }),
+    });
+  }
+
   return NextResponse.json({
     action: "inserted",
     business: inserted[0],
