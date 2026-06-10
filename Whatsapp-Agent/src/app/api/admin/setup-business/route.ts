@@ -37,6 +37,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ action: "request_code", result: data });
   }
 
+  if (action === "subscribe_app") {
+    const { waba_id } = await request.json();
+    const res = await fetch(`https://graph.facebook.com/v19.0/${waba_id}/subscribed_apps`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await res.json();
+    return NextResponse.json({ action: "subscribe_app", result: data });
+  }
+
   if (action === "register") {
     const registerRes = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/register`, {
       method: "POST",
