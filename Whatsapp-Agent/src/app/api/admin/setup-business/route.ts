@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "META_SYSTEM_TOKEN not set in env" }, { status: 500 });
   }
 
-  const { action, phone_number_id, code } = await request.json();
+  const { action, phone_number_id, code, waba_id } = await request.json();
 
   if (action === "request_code") {
     const res = await fetch(`https://graph.facebook.com/v19.0/${phone_number_id}/request_code`, {
@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "subscribe_app") {
-    const { waba_id } = await request.json();
     const res = await fetch(`https://graph.facebook.com/v19.0/${waba_id}/subscribed_apps`, {
       method: "POST",
       headers: {
