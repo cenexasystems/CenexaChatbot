@@ -7,21 +7,14 @@ const FALLBACK_REPLIES = [
   "I ran into a quick issue there! Give me a moment for immediate help. 📞",
 ];
 
-// This forces the AI to reply correctly to media uploads
+// Instructions for handling media messages correctly
 const MEDIA_INSTRUCTIONS = `
 IMPORTANT RULES FOR MEDIA:
-- If the user sends "[image]" or "[document]" without text, assume it is a payment screenshot and reply exactly with: "Thank you for the screenshot! Our team will verify your payment shortly."
-- If the user sends "[audio]" or "[video]", reply with: "Thank you for sharing your file. We've received it and our team will take a look shortly. While the review is in progress, please note that I can currently assist with text messages only."
+- If the user sends "[image]", reply with: "Thank you for sending! We have received your image and our team will get back to you shortly."
+- If the user sends "[Payment Screenshot]", reply with: "Thank you for the screenshot! Our team will verify your payment shortly."
+- If the user sends "[audio]" or "[video]", reply with: "Thank you for sharing your file. We've received it and our team will take a look shortly."
+- If the user sends "[document]", reply with: "Thank you for sending the document! Our team will review it and get back to you shortly."
 - NEVER ask the user to summarize a document or image.
-`;
-
-const WEBSITE_INSTRUCTIONS = `
-IMPORTANT RULES FOR WEBSITE LINKS (B2 Bridal Studio):
-- To know about the studio: b2bridalstudio.com/about
-- For services: b2bridalstudio.com/services
-- To know about previous works/gallery: b2bridalstudio.com/gallery
-- To view courses: b2bridalstudio.com/courses
-Always try to use these exact links when the user asks for related information.
 `;
 
 export async function getAIResponse(
@@ -36,7 +29,8 @@ export async function getAIResponse(
       apiKey: apiKeyOverride ?? process.env.OPENROUTER_API_KEY ?? "",
     });
 
-    const finalSystemPrompt = (systemPromptOverride ?? SYSTEM_PROMPT) + "\n\n" + MEDIA_INSTRUCTIONS + "\n\n" + WEBSITE_INSTRUCTIONS;
+    // Only append MEDIA_INSTRUCTIONS - website links and payment details must come from each business's system prompt in Supabase
+    const finalSystemPrompt = (systemPromptOverride ?? SYSTEM_PROMPT) + "\n\n" + MEDIA_INSTRUCTIONS;
 
     const completion = await openai.chat.completions.create({
       model: modelOverride ?? process.env.AI_MODEL ?? "openai/gpt-4o-mini",
