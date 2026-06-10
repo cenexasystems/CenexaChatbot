@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
     let setPaymentQrSent = false;
     if (reply) {
       const lowerReply = reply.toLowerCase();
-      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("pay"))) {
+      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("pay") || lowerReply.includes("98405") || lowerReply.includes("37761") || lowerReply.includes("balaji"))) {
         setPaymentQrSent = true;
       }
     }
