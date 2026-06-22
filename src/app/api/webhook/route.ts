@@ -5,11 +5,6 @@ import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia, getMediaCategory } from "@/lib/media";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
-const supabase = createAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get("hub.mode");
@@ -24,6 +19,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = (await import("@supabase/supabase-js")).createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy"
+  );
   const body = await request.json();
 
   if (body.object !== "whatsapp_business_account") {

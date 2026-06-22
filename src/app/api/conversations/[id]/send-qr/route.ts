@@ -3,15 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { sendWhatsAppImage } from "@/lib/whatsapp";
 
-const adminSupabase = createAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const adminSupabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy"
+  );
+  
   const { id } = await params;
   const body = await request.json();
   const { imageUrl } = body; // optional — if provided, save as business QR for future use
