@@ -216,7 +216,30 @@ export default function Dashboard() {
   function formatTime(dateStr: string) {
     return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
- 
+
+  function formatDateSeparator(dateStr: string) {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  async function handleDeleteMessage(msgId: string) {
+    if (!selectedId) return;
+    
+    const proceed = window.confirm("Delete Message Options:\n\nUnlike consumer WhatsApp, Meta's Cloud API for businesses does NOT support 'Delete for Everyone' (recalling messages from the customer's phone). \n\nClick OK to 'Delete for Me' (removes from this dashboard).");
+    if (!proceed) return;
+
+    setMessages((prev) => prev.filter(m => m.id !== msgId));
+    await fetch(`/api/conversations/${selectedId}/messages/${msgId}`, {
+      method: "DELETE",
+    });
+  }
+
   function getInitials(name: string | null, phone: string) {
     if (name) return name.slice(0, 2).toUpperCase();
     return phone.slice(-2);
@@ -449,18 +472,49 @@ export default function Dashboard() {
                   {messages.map((msg, i) => {
                     const isUser = msg.role === "user";
                     const showTime = i === messages.length - 1 || messages[i + 1]?.role !== msg.role;
+                    const msgDate = new Date(msg.created_at).toDateString();
+                    const prevMsgDate = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
+                    const showDateSeparator = msgDate !== prevMsgDate;
+
                     return (
-                      <div key={msg.id} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
-                        <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%]`}>
-                          <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "bg-white/[0.07] text-white/90 rounded-tl-sm border border-white/[0.06]" : "bg-emerald-600 text-white rounded-tr-sm"}`}>
-                            {renderMessageContent(msg)}
+                      <div key={msg.id}>
+                        {showDateSeparator && (
+                          <div className="flex justify-center my-5">
+                            <span className="px-3 py-1 bg-white/[0.05] border border-white/[0.06] rounded-md text-[10px] uppercase tracking-wider text-white/40 font-semibold shadow-sm">
+                              {formatDateSeparator(msg.created_at)}
+                            </span>
                           </div>
-                          {showTime && (
-                            <p className="text-[10px] text-white/25 mt-1 px-1">
-                              {!isUser && <span className="text-emerald-500/60 mr-1">AI ·</span>}
-                              {formatTime(msg.created_at)}
-                            </p>
-                          )}
+                        )}
+                        <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-3 group`}>
+                          <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%] relative`}>
+                            {!isUser && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="absolute top-1/2 -translate-y-1/2 -left-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete for me"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                              </button>
+                            )}
+                            {isUser && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="absolute top-1/2 -translate-y-1/2 -right-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete for me"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                              </button>
+                            )}
+                            <div className={`px-3.5 py-2.5 rounded-2xl ${isUser ? "bg-white/[0.07] text-white/90 rounded-tl-sm border border-white/[0.06]" : "bg-emerald-600 text-white rounded-tr-sm"}`}>
+                              {renderMessageContent(msg)}
+                            </div>
+                            {showTime && (
+                              <p className="text-[10px] text-white/25 mt-1 px-1">
+                                {!isUser && <span className="text-emerald-500/60 mr-1">AI ·</span>}
+                                {formatTime(msg.created_at)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
