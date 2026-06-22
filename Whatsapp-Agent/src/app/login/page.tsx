@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { login, signup } from "./actions";
 
 export default function LoginPage() {
@@ -27,8 +26,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0E0E0E] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#161616] rounded-2xl border border-white/5 p-8 shadow-2xl">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 bg-white/[0.02] border border-white/[0.06]">
-            <Image src="/logo.png" alt="Cenexa Logo" width={32} height={32} className="w-8 h-8 object-contain" />
+          <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-emerald-500">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+              <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+              <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+            </svg>
           </div>
           <h1 className="text-2xl font-semibold text-white">
             {mode === "login" ? "Welcome back" : "Create an account"}

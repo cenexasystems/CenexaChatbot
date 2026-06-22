@@ -32,7 +32,7 @@ export async function sendWhatsAppMessage(
 
 export async function sendWhatsAppImage(
   to: string,
-  imageUrl: string,
+  url: string,
   caption: string = "",
   options: SendOptions = {}
 ) {
@@ -51,10 +51,7 @@ export async function sendWhatsAppImage(
         messaging_product: "whatsapp",
         to,
         type: "image",
-        image: {
-          link: imageUrl,
-          caption: caption,
-        },
+        image: { link: url, caption },
       }),
     }
   );

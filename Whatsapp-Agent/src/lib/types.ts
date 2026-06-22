@@ -8,7 +8,6 @@ export interface Business {
   ai_model: string;
   system_prompt: string | null;
   welcome_message: string | null;
-  qr_image_url: string | null;
   plan: "basic" | "pro" | "enterprise";
   is_active: boolean;
   created_at: string;
@@ -31,7 +30,6 @@ export interface Conversation {
   assigned_to: string | null;
   tags: string[];
   payment_status: "none" | "pending" | "verified" | "rejected";
-  payment_qr_sent: boolean;
   internal_note: string | null;
   updated_at: string;
   created_at: string;
@@ -60,4 +58,3 @@ export interface ConversationWithLastMessage extends Conversation {
   last_message: string | null;
   last_message_type: string | null;
 }
-

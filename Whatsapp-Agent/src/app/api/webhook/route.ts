@@ -5,11 +5,6 @@ import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia, getMediaCategory } from "@/lib/media";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
-const supabase = createAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get("hub.mode");
@@ -24,8 +19,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = (await import("@supabase/supabase-js")).createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy"
+  );
   const body = await request.json();
-  let convoId: string | null = null;
 
   if (body.object !== "whatsapp_business_account") {
     return Response.json({ status: "ignored" });
@@ -83,8 +81,8 @@ export async function POST(request: NextRequest) {
         businessAccessToken = biz.access_token;
         businessApiKey = biz.openrouter_api_key;
         businessModel = biz.ai_model;
-        businessSystemPrompt = biz.system_prompt;
-        businessWelcomeMessage = biz.welcome_message;
+        businessSystemPrompt = biz.system_prompt ? biz.system_prompt.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
+        businessWelcomeMessage = biz.welcome_message ? biz.welcome_message.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, 'https://b2bridalstudio.com') : null;
       }
     }
 
@@ -106,10 +104,6 @@ export async function POST(request: NextRequest) {
     } else if (name && name !== conversation.name) {
       await supabase.from("conversations").update({ name }).eq("id", conversation.id);
     }
-    
-    if (conversation) {
-      convoId = conversation.id;
-    }
 
     if (!conversation) {
       return Response.json({ error: "Failed to create conversation" }, { status: 500 });
@@ -120,29 +114,28 @@ export async function POST(request: NextRequest) {
     let mediaType: "image" | "audio" | "document" | "video" | "sticker" | null = null;
     let isPaymentScreenshot = false;
 
-    if (mediaId) {
-      // Always set mediaType from msgType first (this ensures deterministic reply even if storage fails)
-      mediaType = getMediaCategory(msgType === "sticker" ? "image/webp" : `${msgType}/jpeg`);
-
-      // Attempt to store media in Supabase (best-effort — failure doesn't block the reply)
-      if (businessAccessToken) {
-        const stored = await processAndStoreMedia(mediaId, businessAccessToken, conversation.id);
-        if (stored) {
-          mediaUrl = stored.publicUrl;
-          mediaType = stored.mediaType; // Use the real mime-type based category if available
+    if (mediaId && businessAccessToken) {
+      const stored = await processAndStoreMedia(mediaId, businessAccessToken, conversation.id);
+      if (stored) {
+        mediaUrl = stored.publicUrl;
+        mediaType = stored.mediaType;
+        // SMART PAYMENT DETECTION:
+        // Only flag as payment screenshot if our team sent a QR code first
+        if (mediaType === "image") {
+          if (conversation.payment_qr_sent) {
+            isPaymentScreenshot = true;
+            // Reset QR flag and mark payment as pending for team verification
+            await supabase
+              .from("conversations")
+              .update({ payment_status: "pending", payment_qr_sent: false })
+              .eq("id", conversation.id);
+          }
+          // If no QR was sent → treat as a regular image, no payment flag
         }
       }
-
-      // SMART PAYMENT DETECTION:
-      // Only flag as payment screenshot if our team sent a QR code first
-      if (mediaType === "image" && conversation.payment_qr_sent) {
-        isPaymentScreenshot = true;
-        // Reset QR flag and mark payment as pending for team verification
-        await supabase
-          .from("conversations")
-          .update({ payment_status: "pending", payment_qr_sent: false })
-          .eq("id", conversation.id);
-      }
+    } else if (mediaId && !businessAccessToken) {
+      // Fallback: derive category from msgType
+      mediaType = getMediaCategory(msgType === "sticker" ? "image/webp" : `${msgType}/mp4`);
     }
 
     // Store user message (ignore duplicates)
@@ -290,7 +283,7 @@ export async function POST(request: NextRequest) {
     let setPaymentQrSent = false;
     if (reply) {
       const lowerReply = reply.toLowerCase();
-      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("pay") || lowerReply.includes("98405") || lowerReply.includes("37761") || lowerReply.includes("balaji"))) {
+      if (lowerReply.includes("screenshot") && (lowerReply.includes("gpay") || lowerReply.includes("upi") || lowerReply.includes("pay"))) {
         setPaymentQrSent = true;
       }
     }
@@ -335,20 +328,8 @@ export async function POST(request: NextRequest) {
       .eq("id", conversation.id);
 
     return Response.json({ status: "replied" });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Webhook error:", error);
-    
-    // Log the crash to the database so we can see it
-    if (convoId) {
-      try {
-        await supabase.from("messages").insert({
-          conversation_id: convoId,
-          role: "assistant",
-          content: `💥 FATAL CRASH: ${error.message}\nStack: ${error.stack}`,
-        });
-      } catch (e) {}
-    }
-
     return Response.json({ status: "error" }, { status: 500 });
   }
 }

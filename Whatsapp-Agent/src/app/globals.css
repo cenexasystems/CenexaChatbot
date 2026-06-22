@@ -3,77 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-
-  /* ── Dashboard theme tokens ── */
-  --dash-bg: #0f0f0f;
-  --dash-sidebar: #141414;
-  --dash-border: rgba(255,255,255,0.06);
-  --dash-hover: rgba(255,255,255,0.04);
-  --dash-selected: rgba(255,255,255,0.07);
-  --dash-input-bg: rgba(255,255,255,0.06);
-  
-  --dash-msg-user-bg: rgba(255,255,255,0.07);
-  --dash-msg-user-border: rgba(255,255,255,0.06);
-  --dash-msg-user-text: rgba(255,255,255,0.90);
-  
-  --dash-msg-ai-bg: #059669; /* emerald-600 */
-  --dash-msg-ai-text: #ffffff;
-
-  --dash-text-primary: rgba(255,255,255,0.90);
-  --dash-text-secondary: rgba(255,255,255,0.40);
-  --dash-text-muted: rgba(255,255,255,0.25);
-  --dash-text-label: rgba(255,255,255,0.30);
-  --dash-pill-bg: rgba(255,255,255,0.07);
-  --dash-pill-border: rgba(255,255,255,0.10);
-  --dash-note-bg: rgba(245,158,11,0.10);
-  --dash-note-border: rgba(245,158,11,0.20);
-  --dash-note-text: rgba(253,230,138,0.80);
 }
-
-/* ── Light theme overrides (WhatsApp Web style) ── */
-.dashboard-light {
-  --dash-bg: #efeae2; /* Classic WhatsApp beige background */
-  --dash-sidebar: #ffffff;
-  --dash-border: rgba(0,0,0,0.08);
-  --dash-hover: rgba(0,0,0,0.04);
-  --dash-selected: rgba(0,0,0,0.06);
-  --dash-input-bg: rgba(0,0,0,0.05);
-  
-  --dash-msg-user-bg: #ffffff;
-  --dash-msg-user-border: rgba(0,0,0,0.05);
-  --dash-msg-user-text: rgba(0,0,0,0.87);
-  
-  --dash-msg-ai-bg: #d9fdd3; /* WhatsApp sent message green */
-  --dash-msg-ai-text: rgba(0,0,0,0.87);
-
-  --dash-text-primary: rgba(0,0,0,0.85);
-  --dash-text-secondary: rgba(0,0,0,0.45);
-  --dash-text-muted: rgba(0,0,0,0.30);
-  --dash-text-label: rgba(0,0,0,0.35);
-  --dash-pill-bg: rgba(0,0,0,0.06);
-  --dash-pill-border: rgba(0,0,0,0.10);
-  --dash-note-bg: #fff8e1; /* Lighter amber for notes */
-  --dash-note-border: #fde68a;
-  --dash-note-text: #b45309;
-}
-
-/* ── Theme-aware utility classes ── */
-.dash-bg        { background-color: var(--dash-bg); }
-.dash-sidebar   { background-color: var(--dash-sidebar) !important; }
-.dash-border    { border-color: var(--dash-border) !important; }
-.dash-text-primary   { color: var(--dash-text-primary); }
-.dash-text-secondary { color: var(--dash-text-secondary); }
-.dash-text-muted     { color: var(--dash-text-muted); }
-.dash-text-label     { color: var(--dash-text-label); }
-.dash-hover:hover    { background-color: var(--dash-hover); }
-.dash-selected  { background-color: var(--dash-selected); }
-.dash-input-bg  { background-color: var(--dash-input-bg); }
-
-.dash-msg-user  { background-color: var(--dash-msg-user-bg); border-color: var(--dash-msg-user-border); color: var(--dash-msg-user-text); }
-.dash-msg-ai    { background-color: var(--dash-msg-ai-bg); color: var(--dash-msg-ai-text); }
-
-.dash-pill      { background-color: var(--dash-pill-bg); border-color: var(--dash-pill-border); }
-.dash-note      { background-color: var(--dash-note-bg); border-color: var(--dash-note-border); color: var(--dash-note-text); }
 
 @theme inline {
   --color-background: var(--background);
@@ -82,59 +12,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-
-/* ─────────────────────────────────────────────────────
-   Light mode — global overrides for hardcoded white classes
-   ───────────────────────────────────────────────────── */
-
-/* Text colours */
-.dashboard-light .text-white { color: rgba(0,0,0,0.95) !important; }
-.dashboard-light .text-white\/90 { color: rgba(0,0,0,0.90) !important; }
-.dashboard-light .text-white\/80 { color: rgba(0,0,0,0.85) !important; }
-.dashboard-light .text-white\/60 { color: rgba(0,0,0,0.70) !important; }
-.dashboard-light .text-white\/50 { color: rgba(0,0,0,0.65) !important; }
-.dashboard-light .text-white\/40 { color: rgba(0,0,0,0.55) !important; }
-.dashboard-light .text-white\/30 { color: rgba(0,0,0,0.50) !important; }
-.dashboard-light .text-white\/25 { color: rgba(0,0,0,0.45) !important; }
-.dashboard-light .text-white\/20 { color: rgba(0,0,0,0.40) !important; }
-
-/* Colored text overrides for light mode */
-.dashboard-light .text-emerald-400 { color: #047857 !important; } /* emerald-700 */
-.dashboard-light .text-amber-400 { color: #b45309 !important; } /* amber-700 */
-.dashboard-light .text-amber-200\/80 { color: #92400e !important; } /* amber-800 */
-.dashboard-light .text-red-400 { color: #b91c1c !important; } /* red-700 */
-.dashboard-light .text-red-400\/70 { color: #dc2626 !important; } /* red-600 */
-
-/* Background colours */
-.dashboard-light .bg-\[\#0f0f0f\]           { background-color: #efeae2 !important; }
-.dashboard-light .bg-\[\#141414\]           { background-color: #ffffff !important; }
-.dashboard-light .bg-white\/\[0\.07\]       { background-color: rgba(0,0,0,0.06) !important; }
-.dashboard-light .bg-white\/\[0\.06\]       { background-color: rgba(0,0,0,0.05) !important; }
-.dashboard-light .bg-white\/\[0\.05\]       { background-color: rgba(0,0,0,0.05) !important; }
-.dashboard-light .bg-white\/\[0\.04\]       { background-color: rgba(0,0,0,0.04) !important; }
-.dashboard-light .bg-white\/5              { background-color: rgba(0,0,0,0.05) !important; }
-
-/* Borders */
-.dashboard-light .border-white\/\[0\.06\]  { border-color: rgba(0,0,0,0.09) !important; }
-.dashboard-light .border-white\/10         { border-color: rgba(0,0,0,0.10) !important; }
-.dashboard-light .border-white\/20         { border-color: rgba(0,0,0,0.15) !important; }
-
-/* Conversation list item selected/hover */
-.dashboard-light .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.04) !important; }
-.dashboard-light .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.05) !important; }
-.dashboard-light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.05) !important; }
-.dashboard-light .active\:bg-white\/\[0\.06\]:active { background-color: rgba(0,0,0,0.06) !important; }
-
-/* Input / textarea placeholders */
-.dashboard-light input::placeholder,
-.dashboard-light textarea::placeholder { color: rgba(0,0,0,0.40) !important; }
-
-/* Scrollbar (light) */
-.dashboard-light ::-webkit-scrollbar-track { background: #efeae2; }
-.dashboard-light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
-.dashboard-light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }

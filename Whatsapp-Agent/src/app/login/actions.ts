@@ -47,9 +47,8 @@ export async function signup(formData: FormData) {
   if (error) {
     return { error: error.message };
   }
-
-  // New users go to the onboarding flow to connect their WhatsApp number
-  redirect("/onboard");
+  
+  redirect("/");
 }
 
 export async function logout() {
