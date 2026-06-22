@@ -1,7 +1,7 @@
 "use client";
  
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import type { ConversationWithLastMessage, Message, Business } from "@/lib/types";
 
@@ -22,12 +22,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 export default function Dashboard() {
   const router = useRouter();
  
-  const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
-  }, []);
+  const supabase = createClient();
  
   const [business, setBusiness] = useState<Business | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
