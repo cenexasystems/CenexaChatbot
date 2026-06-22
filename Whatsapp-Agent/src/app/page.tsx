@@ -226,7 +226,7 @@ export default function Dashboard() {
   async function handleDeleteMessage(msgId: string) {
     if (!selectedId) return;
     
-    const proceed = window.confirm("Delete Message Options:\n\nUnlike consumer WhatsApp, Meta's Cloud API for businesses does NOT support 'Delete for Everyone' (recalling messages from the customer's phone). \n\nClick OK to 'Delete for Me' (removes from this dashboard).");
+    const proceed = window.confirm("Delete this message? (This only removes it from your dashboard, not the customer's WhatsApp)");
     if (!proceed) return;
 
     setMessages((prev) => prev.filter(m => m.id !== msgId));
@@ -485,8 +485,8 @@ export default function Dashboard() {
                             {!isUser && (
                               <button
                                 onClick={() => handleDeleteMessage(msg.id)}
-                                className="absolute top-1/2 -translate-y-1/2 -left-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                                title="Delete for me"
+                                className="absolute top-1/2 -translate-y-1/2 -left-8 p-1.5 text-white/20 hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete"
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                               </button>
@@ -494,8 +494,8 @@ export default function Dashboard() {
                             {isUser && (
                               <button
                                 onClick={() => handleDeleteMessage(msg.id)}
-                                className="absolute top-1/2 -translate-y-1/2 -right-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                                title="Delete for me"
+                                className="absolute top-1/2 -translate-y-1/2 -right-8 p-1.5 text-white/20 hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete"
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                               </button>
