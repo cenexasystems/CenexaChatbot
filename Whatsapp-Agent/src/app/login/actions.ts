@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 export async function login(formData: FormData) {
@@ -13,13 +14,31 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Check if user has a business profile linked — if not, send to onboarding
+  const userId = signInData.user?.id;
+  if (userId) {
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("business_id")
+      .eq("id", userId)
+      .single();
+
+    if (!profile?.business_id) {
+      redirect("/onboard");
+    }
   }
 
   redirect("/");
@@ -48,7 +67,7 @@ export async function signup(formData: FormData) {
     return { error: error.message };
   }
   
-  redirect("/");
+  redirect("/onboard");
 }
 
 export async function logout() {

@@ -1,10 +1,10 @@
 "use client";
  
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import type { ConversationWithLastMessage, Message, Business } from "@/lib/types";
-
+ 
 const PAYMENT_COLORS: Record<string, string> = {
   pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   verified: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -22,7 +22,12 @@ const PAYMENT_LABELS: Record<string, string> = {
 export default function Dashboard() {
   const router = useRouter();
  
-  const supabase = createClient();
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }, []);
  
   const [business, setBusiness] = useState<Business | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -83,15 +88,22 @@ export default function Dashboard() {
     fetch("/api/me", {
       headers: { Authorization: `Bearer ${authToken}` },
     })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.business) {
-          setBusiness(data.business);
+      .then((r) => {
+        if (r.status === 404) {
+          setAuthLoading(false);
+          router.push("/onboard");
+          return null;
         }
-        setAuthLoading(false);
+        return r.json();
+      })
+      .then((data) => {
+        if (data && data.business) {
+          setBusiness(data.business);
+          setAuthLoading(false);
+        }
       })
       .catch(() => setAuthLoading(false));
-  }, [authToken]);
+  }, [authToken, router]);
  
   const fetchConversations = useCallback(async () => {
     if (!business?.id) return;
@@ -211,7 +223,7 @@ export default function Dashboard() {
   function formatTime(dateStr: string) {
     return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
- 
+
   function formatDateSeparator(dateStr: string) {
     const date = new Date(dateStr);
     const today = new Date();
@@ -226,7 +238,7 @@ export default function Dashboard() {
   async function handleDeleteMessage(msgId: string) {
     if (!selectedId) return;
     
-    const proceed = window.confirm("Delete this message? (This only removes it from your dashboard, not the customer's WhatsApp)");
+    const proceed = window.confirm("Delete Message Options:\n\nUnlike consumer WhatsApp, Meta's Cloud API for businesses does NOT support 'Delete for Everyone' (recalling messages from the customer's phone). \n\nClick OK to 'Delete for Me' (removes from this dashboard).");
     if (!proceed) return;
 
     setMessages((prev) => prev.filter(m => m.id !== msgId));
@@ -485,8 +497,8 @@ export default function Dashboard() {
                             {!isUser && (
                               <button
                                 onClick={() => handleDeleteMessage(msg.id)}
-                                className="absolute top-1/2 -translate-y-1/2 -left-8 p-1.5 text-white/20 hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                                title="Delete"
+                                className="absolute top-1/2 -translate-y-1/2 -left-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete for me"
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                               </button>
@@ -494,8 +506,8 @@ export default function Dashboard() {
                             {isUser && (
                               <button
                                 onClick={() => handleDeleteMessage(msg.id)}
-                                className="absolute top-1/2 -translate-y-1/2 -right-8 p-1.5 text-white/20 hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                                title="Delete"
+                                className="absolute top-1/2 -translate-y-1/2 -right-8 p-1.5 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                                title="Delete for me"
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                               </button>
