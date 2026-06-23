@@ -90,6 +90,7 @@ export default function Dashboard() {
     })
       .then((r) => {
         if (r.status === 404) {
+          setAuthLoading(false);
           router.push("/onboard");
           return null;
         }

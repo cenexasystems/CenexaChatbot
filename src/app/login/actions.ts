@@ -48,7 +48,7 @@ export async function signup(formData: FormData) {
     return { error: error.message };
   }
   
-  redirect("/");
+  redirect("/onboard");
 }
 
 export async function logout() {
