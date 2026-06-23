@@ -88,15 +88,21 @@ export default function Dashboard() {
     fetch("/api/me", {
       headers: { Authorization: `Bearer ${authToken}` },
     })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.business) {
-          setBusiness(data.business);
+      .then((r) => {
+        if (r.status === 404) {
+          router.push("/onboard");
+          return null;
         }
-        setAuthLoading(false);
+        return r.json();
+      })
+      .then((data) => {
+        if (data && data.business) {
+          setBusiness(data.business);
+          setAuthLoading(false);
+        }
       })
       .catch(() => setAuthLoading(false));
-  }, [authToken]);
+  }, [authToken, router]);
  
   const fetchConversations = useCallback(async () => {
     if (!business?.id) return;
