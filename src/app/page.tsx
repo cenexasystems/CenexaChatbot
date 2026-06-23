@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import type { ConversationWithLastMessage, Message, Business } from "@/lib/types";
-
+ 
 const PAYMENT_COLORS: Record<string, string> = {
   pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   verified: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -88,15 +88,22 @@ export default function Dashboard() {
     fetch("/api/me", {
       headers: { Authorization: `Bearer ${authToken}` },
     })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.business) {
-          setBusiness(data.business);
+      .then((r) => {
+        if (r.status === 404) {
+          setAuthLoading(false);
+          router.push("/onboard");
+          return null;
         }
-        setAuthLoading(false);
+        return r.json();
+      })
+      .then((data) => {
+        if (data && data.business) {
+          setBusiness(data.business);
+          setAuthLoading(false);
+        }
       })
       .catch(() => setAuthLoading(false));
-  }, [authToken]);
+  }, [authToken, router]);
  
   const fetchConversations = useCallback(async () => {
     if (!business?.id) return;
@@ -216,7 +223,7 @@ export default function Dashboard() {
   function formatTime(dateStr: string) {
     return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
- 
+
   function formatDateSeparator(dateStr: string) {
     const date = new Date(dateStr);
     const today = new Date();
