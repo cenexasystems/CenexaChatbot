@@ -236,8 +236,15 @@ export async function POST(request: NextRequest) {
         content: welcomeMsg,
       });
 
-      return NextResponse.json({ success: true });
+      // If the first message is just a generic greeting (hi/hello/hey), stop here.
+      // If it contains more content (e.g. an order), fall through and let AI reply too.
+      const isJustGreeting = /^(hi|hello|hey|hii|helo|hai|வணக்கம்|ஹலோ)\s*[!?.]*\s*$/i.test(text.trim());
+      if (isJustGreeting) {
+        return NextResponse.json({ success: true });
+      }
+      // Otherwise fall through to AI response below
     }
+
 
     // Check rate limits
     const limit = await checkAndUpdateRateLimit(conversation.id, conversation);
