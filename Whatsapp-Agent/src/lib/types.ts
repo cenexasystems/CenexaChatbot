@@ -10,6 +10,7 @@ export interface Business {
   welcome_message: string | null;
   plan: "basic" | "pro" | "enterprise";
   is_active: boolean;
+  qr_image_url: string | null;
   created_at: string;
 }
 
@@ -40,6 +41,7 @@ export interface Conversation {
   day_reset_at: string;
   month_reset_at: string;
   is_first_message: boolean;
+  payment_qr_sent: boolean;
 }
 
 export interface Message {
@@ -57,4 +59,6 @@ export interface Message {
 export interface ConversationWithLastMessage extends Conversation {
   last_message: string | null;
   last_message_type: string | null;
+  payment_qr_sent: boolean;
+  last_message_date: string | null;
 }
