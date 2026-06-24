@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const businessId = searchParams.get("business_id");

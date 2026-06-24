@@ -1,7 +1,7 @@
 "use client";
  
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import type { ConversationWithLastMessage, Message, Business } from "@/lib/types";
 import { logout } from "@/app/login/actions";
@@ -24,14 +24,10 @@ export default function Dashboard() {
   const router = useRouter();
  
   const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
+    return createClient();
   }, []);
  
   const [business, setBusiness] = useState<Business | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,13 +59,6 @@ export default function Dashboard() {
  
   // ── Auth check on mount ──
   useEffect(() => {
-    // Safety: if supabase client couldn't be created (missing env vars), stop loading
-    if (!supabase) {
-      setAuthLoading(false);
-      router.push("/login");
-      return;
-    }
-
     let settled = false;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -80,7 +69,6 @@ export default function Dashboard() {
         router.push("/login");
         return;
       }
-      setAuthToken(session.access_token);
     }).catch(() => {
       if (!settled) {
         settled = true;
@@ -95,7 +83,6 @@ export default function Dashboard() {
         router.push("/login");
         return;
       }
-      setAuthToken(session.access_token);
     });
 
     // Hard timeout: if nothing resolves in 10s, stop spinning
@@ -114,29 +101,26 @@ export default function Dashboard() {
 
   // ── Fetch current user's business ──
   useEffect(() => {
-    if (!authToken) return;
-
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
       setAuthLoading(false);
-    }, 8000);
+    }, 10000); // 10s timeout
 
     fetch("/api/me", {
-      headers: { Authorization: `Bearer ${authToken}` },
       signal: controller.signal,
     })
-      .then((r) => {
+      .then((res) => {
         clearTimeout(timeout);
-        if (r.status === 401) {
+        if (res.status === 401) {
           router.push("/login");
           return null;
         }
-        if (r.status === 404) {
+        if (res.status === 404) {
           router.push("/onboard");
           return null;
         }
-        return r.json();
+        return res.json();
       })
       .then((data) => {
         if (data && data.business) {
@@ -146,7 +130,9 @@ export default function Dashboard() {
       })
       .catch((err) => {
         clearTimeout(timeout);
-        if (err.name !== "AbortError") console.error("[/api/me] fetch error:", err);
+        if (err.name !== 'AbortError') {
+          console.error("Profile load failed:", err);
+        }
         setAuthLoading(false);
       });
 
@@ -154,7 +140,7 @@ export default function Dashboard() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [authToken, router]);
+  }, [router]);
  
   const fetchConversations = useCallback(async () => {
     if (!business?.id) return;
