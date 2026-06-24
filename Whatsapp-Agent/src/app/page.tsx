@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import type { ConversationWithLastMessage, Message, Business } from "@/lib/types";
+import { logout } from "@/app/login/actions";
  
 const PAYMENT_COLORS: Record<string, string> = {
   pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -197,8 +198,9 @@ export default function Dashboard() {
   }, [selectedId, fetchConversations, supabase, business?.id]);
  
   async function handleLogout() {
-    await supabase?.auth.signOut();
-    router.push("/login");
+    // Use server action to clear server-side session cookies properly
+    // Client-side signOut() alone doesn't clear SSR cookies, causing middleware to loop
+    await logout();
   }
  
   async function toggleMode() {
