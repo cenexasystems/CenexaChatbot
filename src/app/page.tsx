@@ -192,7 +192,7 @@ export default function Dashboard() {
     if (!supabase || !business?.id) return;
     const channel = supabase
       .channel("realtime-messages")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         const newMsg = payload.new as Message;
         if (newMsg.conversation_id === selectedId) {
           setMessages((prev) => prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]);
