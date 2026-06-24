@@ -14,9 +14,9 @@ const PAYMENT_COLORS: Record<string, string> = {
 };
  
 const PAYMENT_LABELS: Record<string, string> = {
-  pending: "≡ƒÆ│ Payment Pending",
-  verified: "Γ£à Payment Verified",
-  rejected: "Γ¥î Payment Rejected",
+  pending: "💳 Payment Pending",
+  verified: "✅ Payment Verified",
+  rejected: "❌ Payment Rejected",
   none: "",
 };
  
@@ -176,7 +176,7 @@ export default function Dashboard() {
     setMessages(data);
   }, []);
  
-  // Only fetch conversations AFTER business is loaded ΓÇö prevents showing wrong data
+  // Only fetch conversations AFTER business is loaded — prevents showing wrong data
   useEffect(() => {
     if (!business?.id) return;
     fetchConversations();
@@ -186,8 +186,8 @@ export default function Dashboard() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { if (showSearch) searchInputRef.current?.focus(); }, [showSearch]);
  
-  // ΓöÇΓöÇ Realtime ΓöÇΓöÇ
-  // Realtime ΓÇö only subscribe after business is loaded
+  // ── Realtime ──
+  // Realtime — only subscribe after business is loaded
   useEffect(() => {
     if (!supabase || !business?.id) return;
     const channel = supabase
@@ -296,7 +296,7 @@ export default function Dashboard() {
     if (!selectedId || sendingQR) return;
     const qrUrl = uploadedUrl || business?.qr_image_url;
     if (!qrUrl) {
-      // No QR stored yet ΓÇö open file picker to upload first
+      // No QR stored yet — open file picker to upload first
       qrFileInputRef.current?.click();
       return;
     }
@@ -427,7 +427,7 @@ export default function Dashboard() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={msg.media_url} alt="Image" className="max-w-[220px] rounded-lg border border-white/10 cursor-pointer hover:opacity-90 transition-opacity" />
           </a>
-          {msg.is_payment_screenshot && <p className="text-[10px] text-amber-400/80">≡ƒôÄ Payment screenshot</p>}
+          {msg.is_payment_screenshot && <p className="text-[10px] text-amber-400/80">📎 Payment screenshot</p>}
           {msg.content && msg.content !== "[image]" && <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
         </div>
       );
@@ -454,7 +454,7 @@ export default function Dashboard() {
     return <p className="text-sm whitespace-pre-wrap">{msg.content}</p>;
   }
  
-  // ΓöÇΓöÇ Loading state ΓöÇΓöÇ
+  // ── Loading state ──
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -469,7 +469,7 @@ export default function Dashboard() {
   return (
     <div className={`flex h-screen font-sans overflow-hidden dash-bg ${theme === "light" ? "dashboard-light" : ""}`}>
  
-      {/* ΓöÇΓöÇ SIDEBAR ΓöÇΓöÇ */}
+      {/* ── SIDEBAR ── */}
       <div className={`
         ${view === "chat" ? "hidden md:flex" : "flex"}
         w-full md:w-[300px] flex-col border-r dash-border flex-shrink-0 dash-sidebar
@@ -584,9 +584,9 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
                       <p className="text-xs text-white/40 truncate">
-                        {convo.last_message_type === "image" ? "≡ƒô╖ Photo" :
-                         convo.last_message_type === "audio" ? "≡ƒÄñ Voice note" :
-                         convo.last_message_type === "document" ? "≡ƒôä Document" :
+                        {convo.last_message_type === "image" ? "📷 Photo" :
+                         convo.last_message_type === "audio" ? "🎤 Voice note" :
+                         convo.last_message_type === "document" ? "📄 Document" :
                          convo.last_message || ""}
                       </p>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -603,7 +603,7 @@ export default function Dashboard() {
         </div>
       </div>
  
-      {/* ΓöÇΓöÇ CHAT PANEL ΓöÇΓöÇ */}
+      {/* ── CHAT PANEL ── */}
       <div className={`
         ${view === "list" ? "hidden md:flex" : "flex"}
         flex-1 flex-col min-w-0
@@ -625,7 +625,7 @@ export default function Dashboard() {
             {/* Chat Header */}
             <div className="px-4 py-3 border-b dash-border flex items-center justify-between flex-shrink-0 dash-sidebar">
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* Back button ΓÇö mobile only */}
+                {/* Back button — mobile only */}
                 <button
                   onClick={() => { setView("list"); setSelectedId(null); }}
                   className="md:hidden p-1.5 -ml-1 rounded-lg text-white/50 hover:text-white transition-colors flex-shrink-0"
@@ -660,7 +660,6 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
- 
             {/* Messages + Details */}
             <div className="flex-1 flex min-h-0">
               {/* Messages */}
@@ -803,7 +802,7 @@ export default function Dashboard() {
                 />
               )}
 
-              {/* ΓöÇΓöÇ RIGHT DETAILS PANEL ΓöÇΓöÇ */}
+              {/* ── RIGHT DETAILS PANEL ── */}
               {showDetails && (
                 <div className={`
                   fixed inset-y-0 right-0 z-40 w-[280px] sm:w-[320px] md:relative md:w-[240px] md:z-0
@@ -834,10 +833,10 @@ export default function Dashboard() {
                     {selected.payment_status === "pending" && (
                       <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
                         <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Verify Payment</p>
-                        <p className="text-xs dash-text-secondary mb-3">Screenshot received ΓÇö verify payment</p>
+                        <p className="text-xs dash-text-secondary mb-3">Screenshot received — verify payment</p>
                         <div className="flex gap-2">
-                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">Γ£ô Verify</button>
-                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">Γ£ù Reject</button>
+                          <button onClick={() => handleVerifyPayment("approve")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✓ Verify</button>
+                          <button onClick={() => handleVerifyPayment("reject")} disabled={verifyingPayment} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-500 transition-all disabled:opacity-50 flex items-center justify-center gap-1">✗ Reject</button>
                         </div>
                       </div>
                     )}
@@ -861,7 +860,7 @@ export default function Dashboard() {
                         {sendingQR ? (
                           <><svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> Sending...</>
                         ) : (
-                          <>≡ƒÆ│ Send QR Code</>
+                          <>💳 Send QR Code</>
                         )}
                       </button>
                       {selected.payment_qr_sent && (
@@ -875,7 +874,7 @@ export default function Dashboard() {
                           Change QR Image
                         </button>
                       ) : (
-                        <p className="mt-2 text-xs dash-text-secondary text-center">No QR saved ΓÇö click above to upload</p>
+                        <p className="mt-2 text-xs dash-text-secondary text-center">No QR saved — click above to upload</p>
                       )}
                     </div>
  
@@ -888,7 +887,7 @@ export default function Dashboard() {
                         {(selected.tags ?? []).map((tag) => (
                           <span key={tag} className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-white/[0.08] text-zinc-200 border border-white/10">
                             {tag}
-                            <button onClick={() => removeTag(tag)} className="text-zinc-400 hover:text-red-400 transition-colors ml-1 font-bold">├ù</button>
+                            <button onClick={() => removeTag(tag)} className="text-zinc-400 hover:text-red-400 transition-colors ml-1 font-bold">×</button>
                           </span>
                         ))}
                       </div>
@@ -908,7 +907,7 @@ export default function Dashboard() {
                             <button
                               onClick={() => { setNoteEditMode(true); setNoteInput(selected.internal_note ?? ""); }}
                               className="flex-1 py-1 rounded-md bg-white/[0.07] text-[10px] text-white/50 hover:text-white/80 border border-white/[0.06] transition-all"
-                            >Γ£Å∩╕Å Edit</button>
+                            >✏️ Edit</button>
                             <button
                               onClick={async () => {
                                 setNoteInput("");
@@ -922,7 +921,7 @@ export default function Dashboard() {
                                 setConversations((prev) => prev.map((c) => c.id === selected.id ? { ...c, internal_note: "" } : c));
                               }}
                               className="flex-1 py-1 rounded-md bg-red-500/10 text-[10px] text-red-400/70 hover:text-red-400 border border-red-500/20 transition-all"
-                            >≡ƒùæ∩╕Å Delete</button>
+                            >🗑️ Delete</button>
                           </div>
                         </div>
                       ) : (
@@ -947,7 +946,7 @@ export default function Dashboard() {
                               disabled={savingNote}
                               className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 font-semibold transition-all text-xs disabled:opacity-50"
                             >
-                              {savingNote ? "Saving..." : noteSaved ? "Γ£ô Saved!" : "Save Note"}
+                              {savingNote ? "Saving..." : noteSaved ? "✓ Saved!" : "Save Note"}
                             </button>
                           </div>
                         </>
