@@ -62,35 +62,76 @@ export default function Dashboard() {
  
   // ── Auth check on mount ──
   useEffect(() => {
-    if (!supabase) return;
+    // Safety: if supabase client couldn't be created (missing env vars), stop loading
+    if (!supabase) {
+      setAuthLoading(false);
+      router.push("/login");
+      return;
+    }
+
+    let settled = false;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (settled) return;
+      settled = true;
       if (!session) {
+        setAuthLoading(false);
         router.push("/login");
         return;
       }
       setAuthToken(session.access_token);
+    }).catch(() => {
+      if (!settled) {
+        settled = true;
+        setAuthLoading(false);
+        router.push("/login");
+      }
     });
- 
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
+        setAuthLoading(false);
         router.push("/login");
         return;
       }
       setAuthToken(session.access_token);
     });
- 
-    return () => subscription.unsubscribe();
+
+    // Hard timeout: if nothing resolves in 10s, stop spinning
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setAuthLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [supabase, router]);
- 
+
   // ── Fetch current user's business ──
   useEffect(() => {
     if (!authToken) return;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      setAuthLoading(false);
+    }, 8000);
+
     fetch("/api/me", {
       headers: { Authorization: `Bearer ${authToken}` },
+      signal: controller.signal,
     })
       .then((r) => {
+        clearTimeout(timeout);
+        if (r.status === 401) {
+          router.push("/login");
+          return null;
+        }
         if (r.status === 404) {
-          setAuthLoading(false);
           router.push("/onboard");
           return null;
         }
@@ -102,7 +143,16 @@ export default function Dashboard() {
         }
         setAuthLoading(false);
       })
-      .catch(() => setAuthLoading(false));
+      .catch((err) => {
+        clearTimeout(timeout);
+        if (err.name !== "AbortError") console.error("[/api/me] fetch error:", err);
+        setAuthLoading(false);
+      });
+
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [authToken, router]);
  
   const fetchConversations = useCallback(async () => {
