@@ -337,22 +337,35 @@ export default function Dashboard() {
     if (!selectedId) return;
     setVerifyingPayment(true);
     const status = action === "approve" ? "verified" : "rejected";
-    const res = await fetch(`/api/conversations/${selectedId}/verify-payment`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setVerifyingPayment(false);
-    if (res.ok) {
-      // Update local state immediately so the UI reflects the change
+    let result: any = null;
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/verify-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert("Failed to update payment status: " + (result?.error || res.status));
+        setVerifyingPayment(false);
+        return;
+      }
+      // Update local state immediately
       setConversations((prev) =>
         prev.map((c) => c.id === selectedId ? { ...c, payment_status: status as "verified" | "rejected" } : c)
       );
-    } else {
-      const err = await res.json().catch(() => ({}));
-      alert("Failed to update payment status: " + (err.error || res.status));
+      // Show WhatsApp send result
+      if (result?.whatsapp_sent) {
+        alert(`✅ Payment ${status}! WhatsApp confirmation sent to customer.`);
+      } else if (result?.whatsapp_error) {
+        alert(`Payment ${status} in database.\n\n⚠️ WhatsApp message NOT sent:\n${result.whatsapp_error}`);
+      }
+    } catch (e: any) {
+      alert("Network error: " + e.message);
+    } finally {
+      setVerifyingPayment(false);
+      fetchConversations();
     }
-    fetchConversations();
   }
  
   async function addTag() {
