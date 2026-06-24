@@ -99,8 +99,8 @@ export default function Dashboard() {
       .then((data) => {
         if (data && data.business) {
           setBusiness(data.business);
-          setAuthLoading(false);
         }
+        setAuthLoading(false);
       })
       .catch(() => setAuthLoading(false));
   }, [authToken, router]);

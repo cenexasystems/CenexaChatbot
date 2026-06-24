@@ -24,21 +24,29 @@ export async function login(formData: FormData) {
   }
 
   // Check if user has a business profile linked — if not, send to onboarding
-  const userId = signInData.user?.id;
-  if (userId) {
-    const adminClient = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data: profile } = await adminClient
-      .from("profiles")
-      .select("business_id")
-      .eq("id", userId)
-      .single();
+  try {
+    const userId = signInData.user?.id;
+    if (userId) {
+      const adminClient = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("business_id")
+        .eq("id", userId)
+        .single();
 
-    if (!profile?.business_id) {
-      redirect("/onboard");
+      if (!profile?.business_id) {
+        redirect("/onboard");
+      }
     }
+  } catch (err: any) {
+    if (err.message && err.message.includes("NEXT_REDIRECT")) {
+      throw err;
+    }
+    console.error("Login profile check error:", err);
+    // Proceed to redirect("/") instead of crashing if the profile check fails unexpectedly
   }
 
   redirect("/");

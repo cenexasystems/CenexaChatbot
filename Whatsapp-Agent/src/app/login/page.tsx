@@ -12,14 +12,22 @@ export default function LoginPage() {
     setIsPending(true);
     setError(null);
     
-    const action = mode === "login" ? login : signup;
-    const result = await action(formData);
-    
-    if (result?.error) {
-      setError(result.error);
+    try {
+      const action = mode === "login" ? login : signup;
+      const result = await action(formData);
+      
+      if (result?.error) {
+        setError(result.error);
+      }
+    } catch (err: any) {
+      console.error(err);
+      if (err.message && err.message.includes("NEXT_REDIRECT")) {
+        throw err;
+      }
+      setError("An unexpected error occurred during login. Check server logs.");
+    } finally {
+      setIsPending(false);
     }
-    
-    setIsPending(false);
   }
 
   return (
