@@ -336,12 +336,22 @@ export default function Dashboard() {
   async function handleVerifyPayment(action: "approve" | "reject") {
     if (!selectedId) return;
     setVerifyingPayment(true);
-    await fetch(`/api/conversations/${selectedId}/verify-payment`, {
+    const status = action === "approve" ? "verified" : "rejected";
+    const res = await fetch(`/api/conversations/${selectedId}/verify-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ status }),
     });
     setVerifyingPayment(false);
+    if (res.ok) {
+      // Update local state immediately so the UI reflects the change
+      setConversations((prev) =>
+        prev.map((c) => c.id === selectedId ? { ...c, payment_status: status as "verified" | "rejected" } : c)
+      );
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert("Failed to update payment status: " + (err.error || res.status));
+    }
     fetchConversations();
   }
  
