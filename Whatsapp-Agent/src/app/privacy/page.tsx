@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy – Cenexa Systems WhatsApp AI Agent",
+  title: "Privacy Policy – Cenexa Chatflow",
   description:
-    "Privacy Policy for Cenexa Systems' WhatsApp AI Agent application. Learn how we collect, use, and protect your data.",
+    "Privacy Policy for Cenexa Chatflow by Cenexa Systems. Learn how we collect, use, and protect your data.",
 };
 
 export default function PrivacyPage() {
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
           >
             Cenexa Systems
           </div>
-          <div style={{ fontSize: "13px", color: "#94a3b8" }}>WhatsApp AI Agent</div>
+          <div style={{ fontSize: "13px", color: "#94a3b8" }}>Cenexa Chatflow</div>
         </div>
       </header>
 
@@ -124,11 +124,11 @@ export default function PrivacyPage() {
         {/* Intro card */}
         <Section>
           <p style={bodyText}>
-            Welcome to the <strong style={{ color: "#a5b4fc" }}>Cenexa Systems WhatsApp AI Agent</strong>{" "}
+            Welcome to <strong style={{ color: "#a5b4fc" }}>Cenexa Chatflow</strong>{" "}
             (&quot;the Application&quot; or &quot;the App&quot;). This Privacy Policy describes how{" "}
             <strong style={{ color: "#f1f5f9" }}>Cenexa Systems</strong> (&quot;we&quot;,
             &quot;us&quot;, or &quot;our&quot;) collects, uses, shares, and protects information about
-            you when you use our WhatsApp AI Agent application and its associated dashboard.
+            you when you use our Cenexa Chatflow application and its associated dashboard.
           </p>
           <p style={bodyText}>
             By using the Application, you agree to the collection and use of information in accordance
@@ -141,8 +141,8 @@ export default function PrivacyPage() {
         <Section>
           <p style={bodyText}>
             <strong style={{ color: "#f1f5f9" }}>Cenexa Systems</strong> is a technology services
-            business that builds and operates AI-powered automation tools. The{" "}
-            <strong style={{ color: "#a5b4fc" }}>WhatsApp AI Agent</strong> is a business application
+            business that builds and operates AI-powered automation tools.{" "}
+            <strong style={{ color: "#a5b4fc" }}>Cenexa Chatflow</strong> is a business application
             that allows our clients to manage WhatsApp-based customer conversations through an
             AI-assisted dashboard. The App integrates with Meta&apos;s WhatsApp Business Platform API
             and uses Meta Login / Facebook Login to authenticate business operators.
@@ -174,8 +174,8 @@ export default function PrivacyPage() {
           <ul style={listStyle}>
             <li>
               <strong style={{ color: "#e2e8f0" }}>WhatsApp messages:</strong> Content of messages
-              exchanged between your business WhatsApp number and your customers, including text,
-              images, and documents, transmitted through Meta&apos;s WhatsApp Business Cloud API.
+              exchanged between your business WhatsApp number and your customers via Cenexa Chatflow,
+              including text, images, and documents, transmitted through Meta&apos;s WhatsApp Business Cloud API.
             </li>
             <li>
               <strong style={{ color: "#e2e8f0" }}>Sender information:</strong> WhatsApp phone numbers
@@ -208,8 +208,8 @@ export default function PrivacyPage() {
           <ul style={listStyle}>
             <li>
               <strong style={{ color: "#e2e8f0" }}>To provide the Service:</strong> Displaying
-              WhatsApp conversations in the dashboard, enabling AI-assisted responses, and managing
-              business-customer communication.
+              WhatsApp conversations in the Cenexa Chatflow dashboard, enabling AI-assisted responses,
+              and managing business-customer communication.
             </li>
             <li>
               <strong style={{ color: "#e2e8f0" }}>Authentication &amp; Security:</strong> Verifying
@@ -244,8 +244,8 @@ export default function PrivacyPage() {
           </p>
           <ul style={listStyle}>
             <li>
-              Platform Data is used <em>solely</em> to operate and improve the WhatsApp AI Agent
-              dashboard for the business operator whose account the data belongs to.
+              Platform Data is used <em>solely</em> to operate and improve Cenexa Chatflow
+              for the business operator whose account the data belongs to.
             </li>
             <li>
               Platform Data is <strong style={{ color: "#e2e8f0" }}>not</strong> used to discriminate
@@ -423,7 +423,7 @@ export default function PrivacyPage() {
               </a>
             </p>
             <p style={{ margin: "0", color: "#94a3b8", fontSize: "14px" }}>
-              🌐 WhatsApp AI Agent Application
+              🌐 Cenexa Chatflow Application
             </p>
           </div>
         </Section>
