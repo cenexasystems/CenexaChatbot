@@ -313,8 +313,8 @@ export default function PrivacyPage() {
           </ul>
           <p style={bodyText}>
             If you discover a security vulnerability, please report it immediately to{" "}
-            <a href="mailto:support@cenexasystems.com" style={linkStyle}>
-              support@cenexasystems.com
+            <a href="mailto:cenexasystems@gmail.com" style={linkStyle}>
+              cenexasystems@gmail.com
             </a>
             . We will promptly investigate and address any reported issues.
           </p>
@@ -350,8 +350,8 @@ export default function PrivacyPage() {
           </ul>
           <p style={bodyText}>
             To exercise any of these rights, please contact us at{" "}
-            <a href="mailto:support@cenexasystems.com" style={linkStyle}>
-              support@cenexasystems.com
+            <a href="mailto:cenexasystems@gmail.com" style={linkStyle}>
+              cenexasystems@gmail.com
             </a>
             . Requests from Facebook users regarding Platform Data can also be submitted through
             Meta&apos;s data deletion request flow, which we honour within the required timeframe.
@@ -418,12 +418,15 @@ export default function PrivacyPage() {
             </p>
             <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "14px" }}>
               📧{" "}
-              <a href="mailto:support@cenexasystems.com" style={linkStyle}>
-                support@cenexasystems.com
+              <a href="mailto:cenexasystems@gmail.com" style={linkStyle}>
+                cenexasystems@gmail.com
               </a>
             </p>
             <p style={{ margin: "0", color: "#94a3b8", fontSize: "14px" }}>
-              🌐 Cenexa Chatflow Application
+              🌐{" "}
+              <a href="https://cenexasystems.com" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+                cenexasystems.com
+              </a>
             </p>
           </div>
         </Section>

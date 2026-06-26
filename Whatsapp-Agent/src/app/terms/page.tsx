@@ -354,8 +354,8 @@ export default function TermsPage() {
           </p>
           <p style={bodyText}>
             You may terminate your account at any time by contacting us at{" "}
-            <a href="mailto:support@cenexasystems.com" style={linkStyle}>
-              support@cenexasystems.com
+            <a href="mailto:cenexasystems@gmail.com" style={linkStyle}>
+              cenexasystems@gmail.com
             </a>
             . Upon termination, your right to use the Application will immediately cease, and we will
             handle your data in accordance with our Privacy Policy.
@@ -405,7 +405,10 @@ export default function TermsPage() {
               </a>
             </p>
             <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "14px" }}>
-              🌐 Cenexa Chatflow Application
+              🌐{" "}
+              <a href="https://cenexasystems.com" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+                cenexasystems.com
+              </a>
             </p>
             <p style={{ margin: "0", color: "#94a3b8", fontSize: "14px" }}>
               📋{" "}
