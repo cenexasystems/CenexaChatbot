@@ -58,13 +58,7 @@
 }
 
 /* ── Theme-aware utility classes ── */
-.dash-bg {
-  background-color: var(--dash-bg);
-  background-image: url("/wa-pattern.png");
-  background-repeat: repeat;
-  background-size: auto;
-  background-blend-mode: multiply;
-}
+.dash-bg { background-color: var(--dash-bg); }
 .dash-sidebar   { background-color: var(--dash-sidebar) !important; }
 .dash-border    { border-color: var(--dash-border) !important; }
 .dash-text-primary   { color: var(--dash-text-primary); }
