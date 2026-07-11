@@ -687,7 +687,7 @@ export default function Dashboard() {
             <div className="flex-1 flex min-h-0">
               {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg">
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg chat-pattern-bg relative z-0">
                   {messages.map((msg, i) => {
                     const isUser = msg.role === "user";
                     const showTime = i === messages.length - 1 || messages[i + 1]?.role !== msg.role;
@@ -704,7 +704,7 @@ export default function Dashboard() {
                             </span>
                           </div>
                         )}
-                        <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-3 group`}>
+                        <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-3 group relative z-10`}>
                           <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%] relative`}>
                             {!isUser && (
                               <button
@@ -915,8 +915,8 @@ export default function Dashboard() {
                         ))}
                       </div>
                       <div className="flex gap-1.5">
-                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40" />
-                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold">+</button>
+                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 min-w-0 bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40" />
+                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold flex-shrink-0">+</button>
                       </div>
                     </div>
  
