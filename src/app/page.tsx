@@ -687,7 +687,7 @@ export default function Dashboard() {
             <div className="flex-1 flex min-h-0">
               {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg chat-pattern-bg relative z-0">
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 dash-bg">
                   {messages.map((msg, i) => {
                     const isUser = msg.role === "user";
                     const showTime = i === messages.length - 1 || messages[i + 1]?.role !== msg.role;
@@ -704,7 +704,7 @@ export default function Dashboard() {
                             </span>
                           </div>
                         )}
-                        <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-3 group relative z-10`}>
+                        <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-3 group`}>
                           <div className={`flex flex-col ${isUser ? "items-start" : "items-end"} max-w-[80%] md:max-w-[65%] relative`}>
                             {!isUser && (
                               <button
