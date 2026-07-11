@@ -5,7 +5,7 @@
   --foreground: #171717;
 
   /* ── Dashboard theme tokens ── */
-  --dash-bg: #0f0f0f;
+  --dash-bg: #0b141a;
   --dash-sidebar: #141414;
   --dash-border: rgba(255,255,255,0.06);
   --dash-hover: rgba(255,255,255,0.04);
@@ -32,7 +32,7 @@
 
 /* ── Light theme overrides (WhatsApp Web style) ── */
 .dashboard-light {
-  --dash-bg: #efeae2; /* Classic WhatsApp beige background */
+  --dash-bg: #e5ddd5; /* Classic WhatsApp beige background */
   --dash-sidebar: #ffffff;
   --dash-border: rgba(0,0,0,0.08);
   --dash-hover: rgba(0,0,0,0.04);
@@ -68,7 +68,7 @@
   pointer-events: none;
   background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
   background-repeat: repeat;
-  opacity: 0.05;
+  opacity: 0.25;
   z-index: 0;
 }
 .dash-sidebar   { background-color: var(--dash-sidebar) !important; }
@@ -126,7 +126,7 @@ body {
 .dashboard-light .bg-\[\#0f0f0f\]           { background-color: #efeae2 !important; }
 .dashboard-light .chat-pattern-bg::before {
   filter: invert(1);
-  opacity: 0.08;
+  opacity: 0.15;
 }
 .dashboard-light .bg-\[\#141414\]           { background-color: #ffffff !important; }
 .dashboard-light .bg-white\/\[0\.07\]       { background-color: rgba(0,0,0,0.06) !important; }
