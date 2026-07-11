@@ -916,7 +916,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex gap-1.5">
                         <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="Add tag..." className="flex-1 bg-white/[0.04] rounded-lg px-3 py-2 text-xs dash-text-primary placeholder:text-white/30 border border-white/[0.08] focus:outline-none focus:border-emerald-500/40" />
-                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold">+</button>
+                        <button onClick={addTag} className="px-3 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 transition-all text-xs font-semibold flex-shrink-0">+</button>
                       </div>
                     </div>
  
