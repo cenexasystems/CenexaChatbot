@@ -58,11 +58,18 @@
 }
 
 /* ── Theme-aware utility classes ── */
-.dash-bg { 
-  background-color: var(--dash-bg); 
-  background-image: linear-gradient(rgba(15, 15, 15, 0.96), rgba(15, 15, 15, 0.96)), url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+.dash-bg { background-color: var(--dash-bg); }
+
+.chat-pattern-bg { position: relative; }
+.chat-pattern-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
   background-repeat: repeat;
-  background-attachment: fixed;
+  opacity: 0.05;
+  z-index: 0;
 }
 .dash-sidebar   { background-color: var(--dash-sidebar) !important; }
 .dash-border    { border-color: var(--dash-border) !important; }
@@ -117,9 +124,9 @@ body {
 
 /* Background colours */
 .dashboard-light .bg-\[\#0f0f0f\]           { background-color: #efeae2 !important; }
-.dashboard-light .dash-bg {
-  background-color: #efeae2 !important;
-  background-image: linear-gradient(rgba(239, 234, 226, 0.4), rgba(239, 234, 226, 0.4)), url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png") !important;
+.dashboard-light .chat-pattern-bg::before {
+  filter: invert(1);
+  opacity: 0.08;
 }
 .dashboard-light .bg-\[\#141414\]           { background-color: #ffffff !important; }
 .dashboard-light .bg-white\/\[0\.07\]       { background-color: rgba(0,0,0,0.06) !important; }
