@@ -11,6 +11,14 @@ export interface Business {
   plan: "basic" | "pro" | "enterprise";
   is_active: boolean;
   qr_image_url: string | null;
+  waba_id?: string | null;
+  onboarding_type?: "api" | "coexistence";
+  coexistence_synced_at?: string | null;
+  disconnected_reason?: string | null;
+  handoff_minutes?: number;
+  vision_model?: string | null;
+  coexistence_enabled?: boolean;
+  media_ai_enabled?: boolean;
   created_at: string;
 }
 
@@ -42,6 +50,7 @@ export interface Conversation {
   month_reset_at: string;
   is_first_message: boolean;
   payment_qr_sent: boolean;
+  ai_paused_until?: string | null;
 }
 
 export interface Message {
@@ -53,6 +62,9 @@ export interface Message {
   media_type: "image" | "audio" | "document" | "video" | "sticker" | null;
   is_payment_screenshot: boolean;
   whatsapp_msg_id: string | null;
+  source?: "customer" | "ai" | "dashboard" | "business_app" | "history" | null;
+  transcript?: string | null;
+  media_analysis?: Record<string, unknown> | null;
   created_at: string;
 }
 

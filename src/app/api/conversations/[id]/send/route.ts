@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, extractWamid } from "@/lib/whatsapp";
 
 export async function POST(
   request: NextRequest,
@@ -45,7 +45,7 @@ export async function POST(
   }
 
   // Send via WhatsApp using business credentials
-  await sendWhatsAppMessage(conversation.phone, message, { phoneNumberId, accessToken });
+  const waResult = await sendWhatsAppMessage(conversation.phone, message, { phoneNumberId, accessToken });
 
   // Store in DB
   const { data: msg, error: msgError } = await supabase
@@ -53,7 +53,9 @@ export async function POST(
     .insert({
       conversation_id: id,
       role: "assistant",
+      source: "dashboard",
       content: message,
+      whatsapp_msg_id: extractWamid(waResult),
     })
     .select()
     .single();

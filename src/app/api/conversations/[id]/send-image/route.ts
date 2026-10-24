@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { sendWhatsAppImage } from "@/lib/whatsapp";
+import { sendWhatsAppImage, extractWamid } from "@/lib/whatsapp";
 
 export async function POST(
   request: NextRequest,
@@ -60,6 +60,8 @@ export async function POST(
   await adminSupabase.from("messages").insert({
     conversation_id: id,
     role: "assistant",
+    source: "dashboard",
+    whatsapp_msg_id: extractWamid(waResult),
     content: caption || "[Image]",
     media_url: imageUrl,
     media_type: "image",
