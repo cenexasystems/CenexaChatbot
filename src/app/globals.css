@@ -82,6 +82,50 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── ChatFlow 2.0 design tokens (light, warm, one accent) ──
+   Used by the new dashboard under src/app/(app). Classes: bg-canvas,
+   text-ink, border-line, bg-accent, etc. */
+@theme {
+  --color-canvas: #FAF8F4;
+  --color-surface: #FFFFFF;
+  --color-sunken: #F2EFE9;
+  --color-line: #E6E1D8;
+  --color-ink: #1F1D1A;
+  --color-ink-soft: #5E5A52;
+  --color-ink-faint: #6F6A60;
+  --color-accent: #0F6B5C;
+  --color-accent-hover: #0B5A4D;
+  --color-accent-tint: #E3F1EE;
+  --color-attention: #B45309;
+  --color-attention-tint: #FDF1DD;
+  --color-success: #2E7D32;
+  --color-success-tint: #E6F2E7;
+  --color-danger: #B3261E;
+  --color-danger-tint: #FBE9E7;
+  --color-info: #1D5FA8;
+  --color-info-tint: #E5EEF8;
+  --color-ai-tint: #F1EADB;
+  --color-phone-tint: #ECEFF2;
+
+  --radius-card: 12px;
+  --radius-input: 10px;
+}
+
+.cx-root {
+  font-family: var(--font-figtree), var(--font-noto-tamil), var(--font-noto-devanagari), system-ui, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+.cx-root .tabular { font-variant-numeric: tabular-nums; }
+.cx-root :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.cx-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.cx-root ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .cx-root * { transition: none !important; animation: none !important; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

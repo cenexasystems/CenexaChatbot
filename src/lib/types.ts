@@ -73,4 +73,10 @@ export interface ConversationWithLastMessage extends Conversation {
   last_message_type: string | null;
   payment_qr_sent: boolean;
   last_message_date: string | null;
+  /** Role of the latest message ("user" = customer). */
+  last_message_role?: "user" | "assistant" | null;
+  /** Source of the latest message (see Message.source). */
+  last_message_source?: Message["source"];
+  /** Time of the latest customer message; opens Meta's 24-hour reply window. */
+  last_inbound_at?: string | null;
 }

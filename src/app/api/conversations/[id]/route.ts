@@ -8,11 +8,16 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const allowed = ["mode", "assigned_to", "tags", "payment_status", "internal_note"];
+  const allowed = ["mode", "assigned_to", "tags", "payment_status", "internal_note", "ai_paused_until"];
   const update: Record<string, unknown> = {};
 
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
+  }
+
+  // ai_paused_until: null resumes the AI; otherwise must be a valid timestamp.
+  if ("ai_paused_until" in body && body.ai_paused_until !== null && isNaN(Date.parse(body.ai_paused_until))) {
+    return Response.json({ error: "Invalid ai_paused_until" }, { status: 400 });
   }
 
   if (body.mode && !["agent", "human"].includes(body.mode)) {

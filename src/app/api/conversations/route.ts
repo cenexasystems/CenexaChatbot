@@ -33,18 +33,32 @@ export async function GET(request: NextRequest) {
   // Fetch last message for each conversation
   const withLastMessage = await Promise.all(
     (conversations || []).map(async (convo) => {
-      const { data: messages } = await supabase
-        .from("messages")
-        .select("content, role, media_type, created_at")
-        .eq("conversation_id", convo.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      const [{ data: messages }, { data: inbound }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", convo.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+        // Latest customer message: drives the 24-hour reply-window timer.
+        supabase
+          .from("messages")
+          .select("created_at")
+          .eq("conversation_id", convo.id)
+          .eq("role", "user")
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
 
       const lastMsg = messages?.[0];
       return {
         ...convo,
         last_message: lastMsg?.content || null,
         last_message_type: lastMsg?.media_type || null,
+        last_message_role: lastMsg?.role || null,
+        // null on databases without the coexistence migration
+        last_message_source: lastMsg?.source ?? null,
+        last_inbound_at: inbound?.[0]?.created_at || null,
       };
     })
   );
