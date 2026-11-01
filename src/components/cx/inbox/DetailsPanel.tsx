@@ -2,9 +2,8 @@
 import { useRef, useState } from "react";
 import type { ConversationWithLastMessage } from "@/lib/types";
 import { useDashboard } from "../DashboardProvider";
-import { Avatar, Badge, Button, SectionLabel } from "../ui";
-import { Icon } from "../icons";
-import { formatPhone, formatDayLabel } from "@/lib/inbox";
+import { Avatar, Button, Field, SectionLabel, Status, StatusBox, Tag } from "../ui";
+import { aiPausedUntil, formatDayLabel, formatPhone } from "@/lib/inbox";
 
 export function DetailsPanel({
   convo: c,
@@ -17,7 +16,7 @@ export function DetailsPanel({
   onPayment: (status: "verified" | "rejected") => void;
   paymentBusy: boolean;
 }) {
-  const { business, patch, sendQR } = useDashboard();
+  const { business, patch, sendQR, now } = useDashboard();
   const [tag, setTag] = useState("");
   const [note, setNote] = useState(c.internal_note ?? "");
   const [savingNote, setSavingNote] = useState(false);
@@ -29,19 +28,19 @@ export function DetailsPanel({
     if (!v || c.tags?.includes(v)) return setTag("");
     setTag("");
     const ok = await patch(c.id, { tags: [...(c.tags ?? []), v] });
-    if (!ok) onToast("Tag not saved. Try again.", "error");
+    if (!ok) onToast("Tag not saved", "error");
   }
 
   async function removeTag(v: string) {
     const ok = await patch(c.id, { tags: (c.tags ?? []).filter((x) => x !== v) });
-    if (!ok) onToast("Tag not removed. Try again.", "error");
+    if (!ok) onToast("Tag not removed", "error");
   }
 
   async function saveNote() {
     setSavingNote(true);
     const ok = await patch(c.id, { internal_note: note });
     setSavingNote(false);
-    onToast(ok ? "Note saved" : "Note not saved. Try again.", ok ? "ok" : "error");
+    onToast(ok ? "Note saved" : "Note not saved", ok ? "ok" : "error");
   }
 
   async function doSendQR(file?: File) {
@@ -58,110 +57,103 @@ export function DetailsPanel({
   }
 
   const noteDirty = note !== (c.internal_note ?? "");
+  const paused = aiPausedUntil(c, now);
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex items-center gap-3">
-        <Avatar name={c.name} phone={c.phone} size={52} />
+    <div className="divide-y divide-line">
+      <div className="p-4 flex items-center gap-3">
+        <Avatar name={c.name} phone={c.phone} size={44} />
         <div className="min-w-0">
-          <p className="text-[17px] font-semibold truncate">{c.name || "Unknown name"}</p>
-          <a href={`tel:+${c.phone.replace(/\D/g, "")}`} className="text-[14px] text-accent tabular">{formatPhone(c.phone)}</a>
-          <p className="text-[13px] text-ink-faint">First message {formatDayLabel(c.created_at).toLowerCase()}</p>
+          <p className="text-[15px] font-semibold truncate">{c.name || "Unknown"}</p>
+          <a href={`tel:+${c.phone.replace(/\D/g, "")}`} className="text-[12px] font-mono text-ink-soft hover:text-ink">{formatPhone(c.phone)}</a>
         </div>
       </div>
 
-      {/* Payment */}
-      <section>
+      <section className="px-4 py-3">
+        <SectionLabel>Customer</SectionLabel>
+        <dl>
+          <Field label="Replies by">{paused ? <Status>AI paused</Status> : c.mode === "agent" ? <Status tone="success">AI</Status> : <Status tone="dark">Team</Status>}</Field>
+          <Field label="First contact">{formatDayLabel(c.created_at, now)}</Field>
+          <Field label="Messages today"><span className="tabular">{c.msg_count_day ?? 0}</span></Field>
+          <Field label="This month"><span className="tabular">{c.msg_count_month ?? 0}</span></Field>
+        </dl>
+      </section>
+
+      <section className="px-4 py-3">
         <SectionLabel>Payment</SectionLabel>
-        {c.payment_status === "pending" && (
-          <div className="bg-attention-tint rounded-[12px] p-3">
-            <p className="font-semibold text-attention">Screenshot received</p>
-            <p className="text-[14px] text-ink-soft mt-0.5">Check your bank or UPI app, then confirm. The customer gets a WhatsApp message either way.</p>
-            <div className="flex gap-2 mt-3">
-              <Button variant="primary" size="sm" icon="check" className="flex-1" disabled={paymentBusy} onClick={() => onPayment("verified")}>Confirm</Button>
-              <Button variant="danger" size="sm" className="flex-1" disabled={paymentBusy} onClick={() => onPayment("rejected")}>Reject</Button>
+        {c.payment_status === "pending" ? (
+          <div className="rounded-[10px] border border-attention/30 bg-attention-tint p-3">
+            <StatusBox tone="attention">Verify screenshot</StatusBox>
+            <p className="text-[12.5px] text-ink-soft mt-2">Match it in your bank or UPI app. The customer is messaged either way.</p>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <Button variant="danger" size="sm" disabled={paymentBusy} onClick={() => onPayment("rejected")}>Reject</Button>
+              <Button variant="primary" size="sm" icon="check" disabled={paymentBusy} onClick={() => onPayment("verified")}>Confirm</Button>
             </div>
           </div>
-        )}
-        {c.payment_status === "verified" && <Badge tone="success" icon="check">Payment confirmed</Badge>}
-        {c.payment_status === "rejected" && <Badge tone="danger" icon="close">Payment rejected</Badge>}
-        {c.payment_status !== "pending" && (
-          <div className="mt-3 space-y-2">
+        ) : (
+          <>
+            <dl>
+              <Field label="Status">
+                {c.payment_status === "verified" ? (
+                  <Status tone="success">Paid</Status>
+                ) : c.payment_status === "rejected" ? (
+                  <Status tone="danger">Rejected</Status>
+                ) : c.payment_qr_sent ? (
+                  <Status tone="info">QR sent · awaiting</Status>
+                ) : (
+                  <Status>None</Status>
+                )}
+              </Field>
+            </dl>
             <input ref={qrInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && doSendQR(e.target.files[0])} />
-            <Button
-              variant={c.payment_status === "none" ? "primary" : "secondary"}
-              icon="qr"
-              className="w-full"
-              disabled={sendingQR}
-              onClick={() => (business?.qr_image_url ? doSendQR() : qrInput.current?.click())}
-            >
-              {sendingQR ? "Sending…" : business?.qr_image_url ? "Send payment QR" : "Upload and send payment QR"}
-            </Button>
-            {c.payment_qr_sent && c.payment_status === "none" && (
-              <p className="text-[13px] text-info flex items-center gap-1.5"><Icon name="clock" size={14} /> QR sent. Waiting for their screenshot.</p>
-            )}
-            {business?.qr_image_url && (
-              <button onClick={() => qrInput.current?.click()} className="text-[13px] text-ink-soft underline underline-offset-2 hover:text-ink">
-                Use a different QR image
-              </button>
-            )}
-          </div>
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant="primary"
+                size="sm"
+                icon="qr"
+                className="flex-1"
+                disabled={sendingQR}
+                onClick={() => (business?.qr_image_url ? doSendQR() : qrInput.current?.click())}
+              >
+                {sendingQR ? "Sending…" : business?.qr_image_url ? "Send payment QR" : "Upload QR"}
+              </Button>
+              {business?.qr_image_url && (
+                <Button size="sm" variant="secondary" onClick={() => qrInput.current?.click()}>Change</Button>
+              )}
+            </div>
+          </>
         )}
       </section>
 
-      {/* Tags */}
-      <section>
+      <section className="px-4 py-3">
         <SectionLabel>Tags</SectionLabel>
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {(c.tags ?? []).length === 0 && <p className="text-[14px] text-ink-faint">No tags yet. Tags help you find chats later.</p>}
+          {(c.tags ?? []).length === 0 && <p className="text-[12.5px] text-ink-faint">No tags</p>}
           {(c.tags ?? []).map((tg) => (
-            <span key={tg} className="inline-flex items-center gap-1 h-8 pl-3 pr-1 rounded-full bg-sunken text-[13px]">
-              {tg}
-              <button onClick={() => removeTag(tg)} className="w-6 h-6 rounded-full hover:bg-line flex items-center justify-center text-ink-soft" aria-label={`Remove tag ${tg}`}>
-                <Icon name="close" size={12} />
-              </button>
-            </span>
+            <Tag key={tg} onRemove={() => removeTag(tg)}>{tg}</Tag>
           ))}
         </div>
         <form onSubmit={(e) => { e.preventDefault(); addTag(); }} className="flex gap-2">
-          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Add a tag, e.g. Bridal" className="flex-1 min-w-0 h-11 px-3 rounded-[10px] bg-sunken text-[15px] placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/30" aria-label="New tag" />
-          <Button type="submit" icon="plus" disabled={!tag.trim()}>Add</Button>
+          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Add tag" className="flex-1 min-w-0 h-8 px-2.5 rounded-lg border border-line-strong text-[12.5px] placeholder:text-ink-faint focus:outline-none focus:border-ink" aria-label="New tag" />
+          <Button type="submit" size="sm" disabled={!tag.trim()}>Add</Button>
         </form>
       </section>
 
-      {/* Note */}
-      <section>
-        <SectionLabel>Private note</SectionLabel>
+      <section className="px-4 py-3">
+        <SectionLabel>Internal note</SectionLabel>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          placeholder="Only your team sees this"
-          className="w-full px-3 py-2.5 rounded-[10px] bg-sunken text-[15px] placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
+          placeholder="Visible to your team only"
+          className="w-full px-2.5 py-2 rounded-lg border border-line-strong text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-ink resize-y"
         />
         {noteDirty && (
-          <div className="flex gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-2">
             <Button size="sm" variant="ghost" onClick={() => setNote(c.internal_note ?? "")}>Cancel</Button>
-            <Button size="sm" variant="primary" onClick={saveNote} disabled={savingNote}>{savingNote ? "Saving…" : "Save note"}</Button>
+            <Button size="sm" variant="primary" onClick={saveNote} disabled={savingNote}>{savingNote ? "Saving…" : "Save"}</Button>
           </div>
         )}
-      </section>
-
-      {/* Activity */}
-      <section>
-        <SectionLabel>Messages</SectionLabel>
-        <dl className="grid grid-cols-3 gap-2 text-center">
-          {[
-            ["This hour", c.msg_count_hour],
-            ["Today", c.msg_count_day],
-            ["This month", c.msg_count_month],
-          ].map(([label, n]) => (
-            <div key={label as string} className="bg-sunken rounded-[10px] py-2">
-              <dd className="text-[17px] font-semibold tabular">{(n as number) ?? 0}</dd>
-              <dt className="text-[12px] text-ink-soft">{label}</dt>
-            </div>
-          ))}
-        </dl>
       </section>
     </div>
   );

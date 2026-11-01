@@ -1,40 +1,59 @@
 "use client";
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
-import { Badge, Card } from "./ui";
+import { cx } from "./ui";
 
-/** Scrollable page with a title, max width suited to reading on desktop. */
-export function Page({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode }) {
+/** Page with a fixed header bar (section label, title, actions) and scrolling body. */
+export function Page({
+  section,
+  title,
+  subtitle,
+  action,
+  children,
+  wide,
+}: {
+  section?: string;
+  title: string;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-5 pb-10">
-        <header className="flex items-start justify-between gap-3 mb-5">
+    <div className="h-full flex flex-col">
+      <header className="shrink-0 bg-surface border-b border-line">
+        <div className={cx("mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 min-h-16", wide ? "max-w-6xl" : "max-w-5xl")}>
           <div className="min-w-0">
-            <h1 className="text-[24px] sm:text-[30px] font-semibold leading-tight">{title}</h1>
-            {subtitle && <p className="text-[15px] text-ink-soft mt-1">{subtitle}</p>}
+            {section && <p className="eyebrow mb-0.5">{section}</p>}
+            <h1 className="text-[18px] sm:text-[20px] font-semibold leading-tight truncate">{title}</h1>
+            {subtitle && <p className="text-[12.5px] text-ink-faint mt-0.5 truncate">{subtitle}</p>}
           </div>
-          {action}
-        </header>
-        {children}
+          {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
+        </div>
+      </header>
+      <div className="flex-1 overflow-y-auto">
+        <div className={cx("mx-auto px-4 sm:px-6 py-5 pb-10", wide ? "max-w-6xl" : "max-w-5xl")}>{children}</div>
       </div>
     </div>
   );
 }
 
-/** A feature that isn't built yet: says plainly what it will do. */
-export function ComingSoon({ icon, title, body }: { icon: IconName; title: string; body: string }) {
+/** Roadmap rows: features not built yet, stated plainly. */
+export function Roadmap({ items }: { items: { icon: IconName; title: string; body: string }[] }) {
   return (
-    <Card className="p-4 flex gap-3">
-      <span className="w-10 h-10 rounded-full bg-sunken text-ink-soft flex items-center justify-center shrink-0">
-        <Icon name={icon} size={20} />
-      </span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-semibold">{title}</p>
-          <Badge>Coming soon</Badge>
-        </div>
-        <p className="text-[14px] text-ink-soft mt-1 leading-relaxed">{body}</p>
-      </div>
-    </Card>
+    <ul className="divide-y divide-line">
+      {items.map((it) => (
+        <li key={it.title} className="flex items-start gap-3 px-4 py-3.5">
+          <span className="w-8 h-8 rounded-lg border border-line bg-canvas text-ink-soft flex items-center justify-center shrink-0 mt-0.5">
+            <Icon name={it.icon} size={16} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] font-semibold">{it.title}</p>
+            <p className="text-[12.5px] text-ink-faint mt-0.5 leading-relaxed">{it.body}</p>
+          </div>
+          <span className="eyebrow !text-[9.5px] mt-1.5 shrink-0 border border-line rounded px-1.5 py-0.5">Planned</span>
+        </li>
+      ))}
+    </ul>
   );
 }

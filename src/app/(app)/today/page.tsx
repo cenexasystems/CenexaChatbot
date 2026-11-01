@@ -3,9 +3,10 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useDashboard } from "@/components/cx/DashboardProvider";
 import { Page } from "@/components/cx/Page";
-import { Avatar, Badge, Card, EmptyState, WindowTimer, cx } from "@/components/cx/ui";
-import { Icon, type IconName } from "@/components/cx/icons";
+import { Avatar, ButtonLink, EmptyState, Panel, StatTile, Status, WindowTimer } from "@/components/cx/ui";
+import { Icon } from "@/components/cx/icons";
 import {
+  aiPausedUntil,
   isAiHandling,
   isMoneyToConfirm,
   isNewToday,
@@ -32,96 +33,87 @@ export default function TodayPage() {
     [conversations, now]
   );
 
-  const nextUp = useMemo(() => sortByUrgency(conversations.filter((c) => needsYou(c, now)), now).slice(0, 5), [conversations, now]);
+  const queue = useMemo(() => sortByUrgency(conversations.filter((c) => needsYou(c, now)), now), [conversations, now]);
 
   const hour = new Date(now).getHours();
   const greetKey: StringKey = hour < 12 ? "today.greeting.morning" : hour < 17 ? "today.greeting.afternoon" : "today.greeting.evening";
-  const dateLabel = new Date(now).toLocaleDateString(lang === "ta" ? "ta-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long" });
-
-  const cards: { key: StringKey; n: number; href: string; icon: IconName; urgent?: boolean; hint: string }[] = [
-    { key: "today.waiting", n: stats.waiting, href: "/inbox?filter=needs-you", icon: "user", urgent: stats.waiting > 0, hint: "Customers whose last message has no reply yet" },
-    { key: "today.money", n: stats.money, href: "/inbox?filter=money", icon: "rupee", urgent: stats.money > 0, hint: "Payment screenshots to check" },
-    { key: "today.ai", n: stats.ai, href: "/inbox?filter=ai", icon: "bot", hint: "Chats the AI is answering for you" },
-    { key: "today.leads", n: stats.leads, href: "/inbox", icon: "plus", hint: "People who messaged you for the first time today" },
-  ];
+  const dateLabel = new Date(now).toLocaleDateString(lang === "ta" ? "ta-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <Page title={t(greetKey)} subtitle={business?.name ? `${business.name} · ${dateLabel}` : dateLabel}>
-      {/* Counts: each opens the list behind it */}
-      <div className="grid grid-cols-2 gap-3">
-        {cards.map((c) => (
-          <Link
-            key={c.key}
-            href={c.href}
-            title={c.hint}
-            className={cx(
-              "rounded-[12px] border p-4 flex flex-col gap-3 min-h-[116px] transition-colors duration-150",
-              c.urgent ? "bg-attention-tint border-transparent hover:border-attention/30" : "bg-surface border-line hover:bg-sunken"
-            )}
-          >
-            <span className={cx("w-9 h-9 rounded-full flex items-center justify-center", c.urgent ? "bg-surface text-attention" : "bg-sunken text-ink-soft")}>
-              <Icon name={c.icon} size={18} />
-            </span>
-            <div>
-              <p className={cx("text-[30px] font-semibold leading-none tabular", c.urgent && "text-attention")}>{c.n}</p>
-              <p className="text-[14px] text-ink-soft mt-1.5 leading-snug">{t(c.key)}</p>
-            </div>
-          </Link>
-        ))}
+    <Page
+      wide
+      section={dateLabel}
+      title={t(greetKey)}
+      subtitle={business?.name}
+      action={<ButtonLink href="/inbox?filter=needs-you" variant="primary" icon="inbox">Open queue</ButtonLink>}
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatTile label={t("today.waiting")} value={stats.waiting} sub="Awaiting your reply" href="/inbox?filter=needs-you" icon="user" tone={stats.waiting ? "attention" : "neutral"} />
+        <StatTile label={t("today.money")} value={stats.money} sub="Screenshots to verify" href="/inbox?filter=money" icon="rupee" tone={stats.money ? "attention" : "neutral"} />
+        <StatTile label={t("today.ai")} value={stats.ai} sub="Replying automatically" href="/inbox?filter=ai" icon="bot" />
+        <StatTile label={t("today.leads")} value={stats.leads} sub="First message today" href="/inbox" icon="plus" />
       </div>
 
-      {/* Next up */}
-      <section className="mt-8">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-[17px] font-semibold">Reply next</h2>
-          {nextUp.length > 0 && (
-            <Link href="/inbox?filter=needs-you" className="text-[14px] text-accent font-medium">See all</Link>
-          )}
-        </div>
-        {nextUp.length === 0 ? (
-          <Card>
-            <EmptyState icon="check" title="Nobody is waiting" body="The AI is answering your customers. You'll see someone here when they ask for a person or send a payment." />
-          </Card>
+      <Panel
+        className="mt-5"
+        title="Reply queue"
+        meta={queue.length > 0 && <span className="text-[11px] font-bold text-ink-faint tabular">{queue.length}</span>}
+        action={queue.length > 0 && <Link href="/inbox?filter=needs-you" className="text-[12px] font-semibold text-ink hover:underline underline-offset-2">View all</Link>}
+      >
+        {queue.length === 0 ? (
+          <EmptyState icon="check" title="Queue is clear" body="No customer is waiting on a person. The AI is handling every open chat." />
         ) : (
-          <Card className="overflow-hidden">
-            <ul>
-              {nextUp.map((c) => (
-                <li key={c.id} className="border-b border-line last:border-0">
-                  <Link href={`/inbox/${c.id}?filter=needs-you`} className="flex items-center gap-3 px-4 py-3 hover:bg-canvas">
-                    <Avatar name={c.name} phone={c.phone} size={40} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold truncate">{c.name || formatPhone(c.phone)}</p>
-                        <span className="text-[12px] text-ink-faint shrink-0">{timeAgo(c.updated_at, now)}</span>
+          <>
+            {/* Column headings (desktop) */}
+            <div className="hidden md:grid grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_150px_90px_120px_24px] gap-4 px-4 h-9 items-center border-b border-line bg-canvas">
+              {["Customer", "Last message", "Status", "Waiting", "Reply window", ""].map((h) => (
+                <span key={h} className="eyebrow !text-[9.5px]">{h}</span>
+              ))}
+            </div>
+            <ul className="divide-y divide-line">
+              {queue.slice(0, 8).map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/inbox/${c.id}?filter=needs-you`}
+                    className="grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_150px_90px_120px_24px] gap-x-4 gap-y-1 px-4 py-3 items-center hover:bg-canvas transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar name={c.name} phone={c.phone} size={32} />
+                      <div className="min-w-0">
+                        <p className="text-[13.5px] font-semibold truncate">{c.name || formatPhone(c.phone)}</p>
+                        <p className="text-[11.5px] text-ink-faint font-mono truncate">{formatPhone(c.phone)}</p>
                       </div>
-                      <p className="text-[14px] text-ink-soft truncate">{previewText(c)}</p>
                     </div>
-                    <div className="hidden sm:flex shrink-0">
+                    <span className="md:hidden text-[12px] text-ink-faint tabular">{timeAgo(c.updated_at, now)}</span>
+                    <p className="col-span-2 md:col-span-1 text-[13px] text-ink-soft truncate">{previewText(c)}</p>
+                    <div className="col-span-2 md:col-span-1">
                       {isMoneyToConfirm(c) ? (
-                        <Badge tone="attention" icon="rupee">Check payment</Badge>
+                        <Status tone="attention">Verify payment</Status>
+                      ) : aiPausedUntil(c, now) ? (
+                        <Status tone="attention">AI paused</Status>
                       ) : (
-                        <WindowTimer msLeft={windowLeftMs(c.last_inbound_at, now)} compact />
+                        <Status tone="attention">Needs reply</Status>
                       )}
                     </div>
-                    <Icon name="chevron" size={18} className="text-ink-faint shrink-0" />
+                    <span className="hidden md:block text-[13px] tabular text-ink">{timeAgo(c.updated_at, now)}</span>
+                    <span className="hidden md:block"><WindowTimer msLeft={windowLeftMs(c.last_inbound_at, now)} /></span>
+                    <Icon name="chevron" size={16} className="hidden md:block text-ink-faint" />
                   </Link>
                 </li>
               ))}
             </ul>
-          </Card>
+          </>
         )}
-      </section>
+      </Panel>
 
-      {/* First-run guidance */}
       {conversations.length === 0 && (
-        <section className="mt-8">
-          <h2 className="text-[17px] font-semibold mb-3">Get set up</h2>
-          <Card className="p-4 space-y-3 text-[15px]">
-            <p className="flex items-center gap-2"><Icon name="check" size={18} className="text-success" /> WhatsApp number connected</p>
-            <p className="flex items-center gap-2 text-ink-soft"><Icon name="qr" size={18} /> Share your WhatsApp link or QR so customers can reach you</p>
-            <p className="flex items-center gap-2 text-ink-soft"><Icon name="assistant" size={18} /> Tell the AI about your prices and timings</p>
-          </Card>
-        </section>
+        <Panel className="mt-5" title="Setup">
+          <ul className="divide-y divide-line text-[13px]">
+            <li className="flex items-center gap-3 px-4 py-3"><Status tone="success">Done</Status> WhatsApp number connected</li>
+            <li className="flex items-center gap-3 px-4 py-3"><Status>To do</Status> Share your WhatsApp link or QR with customers</li>
+            <li className="flex items-center gap-3 px-4 py-3"><Status>To do</Status> Add your prices and timings for the AI</li>
+          </ul>
+        </Panel>
       )}
     </Page>
   );

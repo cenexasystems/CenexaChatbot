@@ -34,7 +34,6 @@ export function ChatView({ id }: { id: string }) {
 
   // Keep the chat pinned to the newest message, including when images finish
   // loading, unless the user has scrolled up to read older messages.
-  const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   useEffect(() => {
@@ -70,7 +69,7 @@ export function ChatView({ id }: { id: string }) {
   if (!c) {
     return (
       <div className="h-full flex items-center justify-center bg-canvas">
-        {conversations.length === 0 ? <Spinner /> : <EmptyState icon="inbox" title="Chat not found" body="It may have been removed." action={<Link href="/inbox" className="text-accent font-medium">Back to inbox</Link>} />}
+        {conversations.length === 0 ? <Spinner /> : <EmptyState icon="inbox" title="Chat not found" body="It may have been removed." action={<Link href="/inbox" className="text-[13px] font-semibold underline">Back to inbox</Link>} />}
       </div>
     );
   }
@@ -94,14 +93,14 @@ export function ChatView({ id }: { id: string }) {
       }
       setText("");
     } catch (e) {
-      showToast((e as Error).message || "Not sent. Check your connection and try again.", "error");
+      showToast((e as Error).message || "Not sent. Check your connection.", "error");
     } finally {
       setSending(false);
     }
   }
 
   async function handlePayment(status: "verified" | "rejected") {
-    if (status === "rejected" && !window.confirm("Reject this payment? The customer will be told to check and send it again.")) return;
+    if (status === "rejected" && !window.confirm("Reject this payment? The customer will be asked to check and resend.")) return;
     setPaymentBusy(true);
     const r = await verifyPayment(id, status);
     setPaymentBusy(false);
@@ -109,13 +108,13 @@ export function ChatView({ id }: { id: string }) {
   }
 
   async function handleDelete(msgId: string) {
-    if (!window.confirm("Remove this message from the dashboard?\n\nWhatsApp doesn't let businesses unsend messages, so the customer will still see it.")) return;
+    if (!window.confirm("Remove this message from the dashboard?\n\nWhatsApp doesn't let businesses unsend messages. The customer will still see it.")) return;
     await deleteMessage(id, msgId);
   }
 
   async function setMode(mode: "agent" | "human") {
     const ok = mode === "agent" ? (await resumeAI(id), true) : await patch(id, { mode });
-    if (ok === false) showToast("Could not change who replies. Try again.", "error");
+    if (ok === false) showToast("Could not switch. Try again.", "error");
   }
 
   // Keyed by chat so the note draft resets when you open another chat.
@@ -126,14 +125,14 @@ export function ChatView({ id }: { id: string }) {
       <div className="flex-1 min-w-0 flex flex-col bg-canvas">
         {/* Header */}
         <header className="shrink-0 h-16 px-2 sm:px-4 flex items-center gap-2 border-b border-line bg-surface">
-          <Link href={backHref} className="md:hidden w-11 h-11 flex items-center justify-center text-ink-soft -ml-1" aria-label="Back to inbox">
+          <Link href={backHref} className="md:hidden w-10 h-10 flex items-center justify-center text-ink -ml-1" aria-label="Back to inbox">
             <Icon name="back" size={22} />
           </Link>
           <button onClick={() => setDetailsOpen(true)} className="flex items-center gap-3 min-w-0 flex-1 text-left xl:pointer-events-none">
-            <span className="hidden sm:inline-flex"><Avatar name={c.name} phone={c.phone} size={40} /></span>
+            <span className="hidden sm:inline-flex"><Avatar name={c.name} phone={c.phone} size={36} /></span>
             <div className="min-w-0">
-              <p className="font-semibold truncate">{c.name || formatPhone(c.phone)}</p>
-              <p className="text-[13px] text-ink-soft truncate tabular">{c.name ? formatPhone(c.phone) : "Tap for details"}</p>
+              <p className="text-[14.5px] font-semibold truncate leading-tight">{c.name || formatPhone(c.phone)}</p>
+              <p className="text-[11.5px] text-ink-faint font-mono truncate mt-0.5">{formatPhone(c.phone)}</p>
             </div>
           </button>
           <ModeSwitch mode={paused ? "human" : c.mode} onChange={setMode} />
@@ -142,22 +141,19 @@ export function ChatView({ id }: { id: string }) {
 
         {/* Who is replying */}
         {paused ? (
-          <Banner tone="neutral" icon="phone">
-            <span className="flex-1">
-              You replied from your phone. <strong>AI is paused for {formatDuration(paused.getTime() - now)}.</strong>
-            </span>
-            <Button size="sm" variant="secondary" icon="play" onClick={() => resumeAI(id)}>Resume now</Button>
-          </Banner>
+          <Bar label="AI paused" icon="phone">
+            <span className="flex-1 min-w-0">You replied from the phone app. AI resumes in <strong className="tabular">{formatDuration(paused.getTime() - now)}</strong>.</span>
+            <Button size="sm" variant="secondary" icon="play" onClick={() => resumeAI(id)}>Resume</Button>
+          </Bar>
         ) : c.mode === "human" ? (
-          <Banner tone="accent" icon="user">
-            <span className="flex-1">AI is off for this chat. You&apos;re replying.</span>
-            <Button size="sm" variant="secondary" icon="bot" onClick={() => setMode("agent")}>Let AI reply</Button>
-          </Banner>
+          <Bar label="Manual" icon="user">
+            <span className="flex-1 min-w-0">AI is off for this chat.</span>
+            <Button size="sm" variant="secondary" icon="bot" onClick={() => setMode("agent")}>Hand to AI</Button>
+          </Bar>
         ) : null}
 
         {/* Messages */}
         <div
-          ref={scrollRef}
           onScroll={(e) => {
             const el = e.currentTarget;
             stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -167,17 +163,19 @@ export function ChatView({ id }: { id: string }) {
           {!list ? (
             <div className="flex justify-center py-10"><Spinner /></div>
           ) : list.length === 0 ? (
-            <EmptyState icon="inbox" title="No messages yet" body="Messages in this chat will appear here." />
+            <EmptyState icon="inbox" title="No messages" body="Messages in this chat will appear here." />
           ) : (
-            <div ref={contentRef} className="space-y-3 max-w-3xl mx-auto">
+            <div ref={contentRef} className="space-y-4 max-w-3xl mx-auto">
               {list.map((m, i) => {
                 const day = new Date(m.created_at).toDateString();
                 const showDay = i === 0 || new Date(list[i - 1].created_at).toDateString() !== day;
                 return (
                   <div key={m.id}>
                     {showDay && (
-                      <div className="flex justify-center my-4">
-                        <span className="px-3 h-7 inline-flex items-center rounded-full bg-sunken text-[12px] font-medium text-ink-soft">{formatDayLabel(m.created_at, now)}</span>
+                      <div className="flex items-center gap-3 my-4">
+                        <span className="flex-1 h-px bg-line" />
+                        <span className="eyebrow !text-[9.5px]">{formatDayLabel(m.created_at, now)}</span>
+                        <span className="flex-1 h-px bg-line" />
                       </div>
                     )}
                     <MessageBubble
@@ -197,22 +195,22 @@ export function ChatView({ id }: { id: string }) {
         </div>
 
         {/* Composer */}
-        <div className="shrink-0 border-t border-line bg-surface px-2 sm:px-4 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
-          <div className="flex items-center gap-2 mb-2 px-1 flex-wrap">
-            {windowKnown && <WindowTimer msLeft={windowLeft} />}
-            {windowKnown && windowLeft === null && (
-              <span className="text-[12px] text-ink-faint">A normal reply may not be delivered. Templates are coming soon.</span>
-            )}
-          </div>
+        <div className="shrink-0 border-t border-line bg-surface px-3 sm:px-4 pt-2.5" style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}>
+          {windowKnown && (
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <WindowTimer msLeft={windowLeft} long />
+              {windowLeft === null && <span className="text-[11px] text-ink-faint hidden sm:inline">Templates coming soon</span>}
+            </div>
+          )}
           {image && (
-            <div className="flex items-center gap-3 mb-2 p-2 rounded-[10px] bg-sunken">
+            <div className="flex items-center gap-3 mb-2 p-2 rounded-[10px] border border-line bg-canvas">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.preview} alt="" className="w-12 h-12 rounded-[8px] object-cover" />
-              <p className="flex-1 min-w-0 text-[14px] truncate">{image.file.name}</p>
+              <img src={image.preview} alt="" className="w-10 h-10 rounded-md object-cover" />
+              <p className="flex-1 min-w-0 text-[12.5px] truncate">{image.file.name}</p>
               <IconButton icon="close" label="Remove photo" onClick={() => { URL.revokeObjectURL(image.preview); setImage(null); }} />
             </div>
           )}
-          <div className="flex items-end gap-1">
+          <div className="flex items-end gap-2">
             <input
               ref={fileRef}
               type="file"
@@ -224,7 +222,7 @@ export function ChatView({ id }: { id: string }) {
                 e.target.value = "";
               }}
             />
-            <IconButton icon="image" label="Send a photo" onClick={() => fileRef.current?.click()} />
+            <IconButton icon="image" label="Attach photo" bordered onClick={() => fileRef.current?.click()} />
             <textarea
               ref={textRef}
               rows={1}
@@ -236,24 +234,26 @@ export function ChatView({ id }: { id: string }) {
                   handleSend();
                 }
               }}
-              placeholder={image ? "Add a caption (optional)" : `Reply as ${business?.name ?? "your business"}`}
-              className="flex-1 min-h-11 max-h-[140px] px-3.5 py-2.5 rounded-[10px] bg-sunken text-[16px] leading-snug placeholder:text-ink-faint resize-none focus:outline-none focus:ring-2 focus:ring-accent/30"
+              placeholder={image ? "Caption (optional)" : `Reply as ${business?.name ?? "business"}…`}
+              className="flex-1 min-h-10 max-h-[140px] px-3 py-2 rounded-[10px] border border-line-strong bg-surface text-[14px] leading-snug placeholder:text-ink-faint resize-none focus:outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               aria-label="Message"
             />
             <button
               onClick={handleSend}
               disabled={sending || (!text.trim() && !image)}
-              className="w-11 h-11 rounded-[10px] bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent-hover disabled:opacity-40 transition-colors"
+              className="h-10 px-4 rounded-[10px] bg-ink text-white flex items-center gap-2 shrink-0 text-[12px] font-bold uppercase tracking-[0.08em] hover:bg-accent-hover disabled:opacity-30 transition-colors"
               aria-label="Send"
             >
-              {sending ? <Spinner size={16} /> : <Icon name="send" size={18} />}
+              {sending ? <Spinner size={14} /> : <Icon name="send" size={15} />}
+              <span className="hidden sm:inline">Send</span>
             </button>
           </div>
+          <p className="hidden sm:block text-[10.5px] text-ink-faint mt-1.5">Enter to send · Shift + Enter for a new line</p>
         </div>
       </div>
 
       {/* Side card on wide screens, sheet elsewhere */}
-      <aside className="hidden xl:block w-[340px] shrink-0 border-l border-line bg-surface overflow-y-auto">{details}</aside>
+      <aside className="hidden xl:block w-[320px] shrink-0 border-l border-line bg-surface overflow-y-auto">{details}</aside>
       <div className="xl:hidden">
         <Sheet open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Customer details">
           {details}
@@ -264,10 +264,11 @@ export function ChatView({ id }: { id: string }) {
         <div
           role="status"
           className={cx(
-            "fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-[60] max-w-[90vw] px-4 py-3 rounded-[12px] shadow-lg text-[14px]",
+            "fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-[60] max-w-[90vw] pl-3 pr-4 h-11 rounded-[12px] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.45)] text-[13px] font-medium flex items-center gap-2",
             toast.tone === "ok" ? "bg-ink text-white" : "bg-danger text-white"
           )}
         >
+          <Icon name={toast.tone === "ok" ? "check" : "alert"} size={16} />
           {toast.msg}
         </div>
       )}
@@ -277,7 +278,7 @@ export function ChatView({ id }: { id: string }) {
 
 function ModeSwitch({ mode, onChange }: { mode: "agent" | "human"; onChange: (m: "agent" | "human") => void }) {
   return (
-    <div className="flex shrink-0 bg-sunken rounded-[10px] p-0.5" role="radiogroup" aria-label="Who replies">
+    <div className="flex shrink-0 border border-line-strong rounded-[10px] p-0.5 bg-surface" role="radiogroup" aria-label="Who replies">
       {(["agent", "human"] as const).map((m) => (
         <button
           key={m}
@@ -285,23 +286,25 @@ function ModeSwitch({ mode, onChange }: { mode: "agent" | "human"; onChange: (m:
           aria-checked={mode === m}
           onClick={() => mode !== m && onChange(m)}
           className={cx(
-            "h-9 px-2.5 sm:px-3 rounded-[8px] text-[13px] font-medium flex items-center gap-1.5 transition-colors",
-            mode === m ? "bg-surface text-ink shadow-sm" : "text-ink-soft hover:text-ink"
+            "h-8 px-2.5 sm:px-3 rounded-[8px] text-[11px] font-bold uppercase tracking-[0.08em] flex items-center gap-1.5 transition-colors",
+            mode === m ? "bg-ink text-white" : "text-ink-faint hover:text-ink"
           )}
         >
-          <Icon name={m === "agent" ? "bot" : "user"} size={15} />
-          <span className="hidden sm:inline">{m === "agent" ? "AI replies" : "You reply"}</span>
-          <span className="sm:hidden">{m === "agent" ? "AI" : "You"}</span>
+          <Icon name={m === "agent" ? "bot" : "user"} size={14} />
+          {m === "agent" ? "AI" : "Team"}
         </button>
       ))}
     </div>
   );
 }
 
-function Banner({ tone, icon, children }: { tone: "neutral" | "accent"; icon: "phone" | "user"; children: React.ReactNode }) {
+function Bar({ label, icon, children }: { label: string; icon: "phone" | "user"; children: React.ReactNode }) {
   return (
-    <div className={cx("shrink-0 flex items-center gap-3 px-4 py-2 text-[14px] border-b border-line", tone === "accent" ? "bg-accent-tint" : "bg-phone-tint")}>
-      <Icon name={icon} size={18} className="shrink-0 text-ink-soft" />
+    <div className="shrink-0 flex items-center gap-3 px-4 py-2 text-[12.5px] text-ink-soft border-b border-line bg-surface">
+      <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-ink text-white text-[10px] font-bold uppercase tracking-[0.1em] shrink-0">
+        <Icon name={icon} size={12} />
+        {label}
+      </span>
       {children}
     </div>
   );

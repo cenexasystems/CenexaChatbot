@@ -1,7 +1,6 @@
 "use client";
-import Link from "next/link";
 import { useDashboard } from "@/components/cx/DashboardProvider";
-import { EmptyState } from "@/components/cx/ui";
+import { ButtonLink, EmptyState } from "@/components/cx/ui";
 import { needsYou } from "@/lib/inbox";
 
 // Shown beside the list on tablet and desktop when no chat is open.
@@ -13,12 +12,12 @@ export default function InboxHome() {
       {waiting > 0 ? (
         <EmptyState
           icon="inbox"
-          title={`${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for you`}
-          body="Start with the oldest. The AI is handling everyone else."
-          action={<Link href="/inbox?filter=needs-you" className="inline-flex items-center h-11 px-4 rounded-[10px] bg-accent text-white font-medium hover:bg-accent-hover">Show who needs you</Link>}
+          title={`${waiting} waiting for a reply`}
+          body="Oldest first. Everything else is handled by the AI."
+          action={<ButtonLink href="/inbox?filter=needs-you" variant="primary">Open queue</ButtonLink>}
         />
       ) : (
-        <EmptyState icon="check" title="You're all caught up" body="Pick a chat on the left to read it. New messages appear here as they arrive." />
+        <EmptyState icon="check" title="No chat selected" body="Select a conversation from the list." />
       )}
     </div>
   );

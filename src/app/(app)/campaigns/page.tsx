@@ -1,22 +1,22 @@
 "use client";
-import { ComingSoon, Page } from "@/components/cx/Page";
-import { Card, EmptyState } from "@/components/cx/ui";
+import { Page, Roadmap } from "@/components/cx/Page";
+import { Button, EmptyState, Panel } from "@/components/cx/ui";
 
 export default function CampaignsPage() {
   return (
-    <Page title="Campaigns" subtitle="Send an offer to the right people, safely">
-      <Card>
-        <EmptyState
-          icon="campaigns"
-          title="Campaigns are on the way"
-          body="You'll pick a message template, choose who gets it, and see how many people it reaches and what it costs before anything is sent."
+    <Page wide section="Marketing" title="Campaigns" subtitle="Template broadcasts to customer groups" action={<Button variant="primary" icon="plus" disabled title="Coming soon">New campaign</Button>}>
+      <Panel title="Campaigns">
+        <EmptyState icon="campaigns" title="No campaigns yet" body="Campaigns are not available yet. They will appear here once enabled for your account." />
+      </Panel>
+      <Panel className="mt-5" title="Roadmap">
+        <Roadmap
+          items={[
+            { icon: "rupee", title: "Cost preview", body: "Audience size, Meta charge and Cenexa fee as separate lines before sending. Test send to your own number." },
+            { icon: "checks", title: "Delivery results", body: "Delivered, read, replied and paid per campaign." },
+            { icon: "link", title: "Click-to-chat links and QR", body: "Source-tagged links for your shop, Instagram and website." },
+          ]}
         />
-      </Card>
-      <div className="mt-6 space-y-3">
-        <ComingSoon icon="rupee" title="Cost before you send" body="Meta's charge and our fee shown as separate lines, with a test send to your own number first." />
-        <ComingSoon icon="checks" title="Results that matter" body="Delivered, read, replied and paid, not just how many were sent." />
-        <ComingSoon icon="link" title="Bring in enquiries" body="A WhatsApp link and QR for your shop, Instagram and website, so you can see where each customer came from." />
-      </div>
+      </Panel>
     </Page>
   );
 }

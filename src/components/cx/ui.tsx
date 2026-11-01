@@ -1,5 +1,6 @@
 "use client";
-// Small UI kit for ChatFlow 2.0. Tokens live in globals.css (@theme).
+// UI kit for ChatFlow 2.0. Monochrome, dense, colour only for status.
+// Tokens live in globals.css (@theme).
 import { useEffect, type ButtonHTMLAttributes, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "./icons";
@@ -10,13 +11,15 @@ export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
+// ── Buttons ──────────────────────────────────────────────────────────────
+
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent-hover",
-  secondary: "bg-surface text-ink border border-line hover:bg-sunken",
+  primary: "bg-accent text-white hover:bg-accent-hover shadow-[0_1px_2px_rgba(0,0,0,0.25)]",
+  secondary: "bg-surface text-ink border border-line-strong hover:bg-sunken",
   ghost: "text-ink-soft hover:bg-sunken hover:text-ink",
-  danger: "bg-surface text-danger border border-line hover:bg-danger-tint",
+  danger: "bg-surface text-danger border border-line-strong hover:bg-danger-tint hover:border-danger/40",
 };
 
 export function Button({
@@ -31,15 +34,32 @@ export function Button({
     <button
       {...rest}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-[10px] font-medium transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none",
-        size === "md" ? "min-h-11 px-4 text-[15px]" : "min-h-9 px-3 text-[13px]",
+        "inline-flex items-center justify-center gap-1.5 rounded-[10px] font-semibold transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none select-none whitespace-nowrap",
+        size === "md" ? "h-10 px-4 text-[13px]" : "h-8 px-3 text-[12px]",
         VARIANTS[variant],
         className
       )}
     >
-      {icon && <Icon name={icon} size={size === "md" ? 18 : 16} />}
+      {icon && <Icon name={icon} size={size === "md" ? 16 : 14} />}
       {children}
     </button>
+  );
+}
+
+/** A link that looks like a Button. */
+export function ButtonLink({ href, variant = "secondary", icon, children, className }: { href: string; variant?: Variant; icon?: IconName; children: ReactNode; className?: string }) {
+  return (
+    <Link
+      href={href}
+      className={cx(
+        "inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-[10px] text-[13px] font-semibold transition-colors duration-150 whitespace-nowrap",
+        VARIANTS[variant],
+        className
+      )}
+    >
+      {icon && <Icon name={icon} size={16} />}
+      {children}
+    </Link>
   );
 }
 
@@ -47,127 +67,124 @@ export function IconButton({
   icon,
   label,
   className,
+  bordered,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; bordered?: boolean }) {
   return (
     <button
       {...rest}
       aria-label={label}
       title={label}
       className={cx(
-        "inline-flex items-center justify-center w-11 h-11 rounded-[10px] text-ink-soft hover:bg-sunken hover:text-ink transition-colors duration-150 shrink-0",
+        "inline-flex items-center justify-center w-10 h-10 rounded-[10px] text-ink-soft hover:bg-sunken hover:text-ink transition-colors duration-150 shrink-0",
+        bordered && "border border-line-strong bg-surface",
         className
       )}
     >
-      <Icon name={icon} size={20} />
+      <Icon name={icon} size={18} />
     </button>
   );
 }
 
-export function Chip({
-  active,
-  count,
-  children,
-  onClick,
-  href,
-}: {
-  active?: boolean;
-  count?: number;
-  children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-}) {
-  const cls = cx(
-    "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-medium whitespace-nowrap border transition-colors duration-150",
-    active ? "bg-accent text-white border-accent" : "bg-surface text-ink-soft border-line hover:text-ink hover:bg-sunken"
-  );
-  const inner = (
-    <>
-      {children}
-      {count !== undefined && count > 0 && (
-        <span className={cx("tabular text-[12px] rounded-full px-1.5 min-w-5 text-center", active ? "bg-white/20" : "bg-sunken text-ink")}>
-          {count}
-        </span>
-      )}
-    </>
-  );
-  if (href) {
-    return (
-      <Link href={href} className={cls} scroll={false} aria-current={active ? "true" : undefined}>
-        {inner}
-      </Link>
-    );
-  }
-  return (
-    <button type="button" onClick={onClick} className={cls} aria-pressed={active}>
-      {inner}
-    </button>
-  );
-}
+// ── Status, tags, sender labels ──────────────────────────────────────────
 
-type Tone = "neutral" | "accent" | "attention" | "success" | "danger" | "info" | "ai" | "phone";
+export type Tone = "neutral" | "attention" | "success" | "danger" | "info" | "dark";
 
-const TONES: Record<Tone, string> = {
-  neutral: "bg-sunken text-ink-soft",
-  accent: "bg-accent-tint text-accent",
-  attention: "bg-attention-tint text-attention",
-  success: "bg-success-tint text-success",
-  danger: "bg-danger-tint text-danger",
-  info: "bg-info-tint text-info",
-  ai: "bg-ai-tint text-[#6B5320]",
-  phone: "bg-phone-tint text-[#46505A]",
+const DOT: Record<Tone, string> = {
+  neutral: "bg-ink-faint",
+  attention: "bg-attention",
+  success: "bg-success",
+  danger: "bg-danger",
+  info: "bg-info",
+  dark: "bg-ink",
+};
+const TEXT: Record<Tone, string> = {
+  neutral: "text-ink-soft",
+  attention: "text-attention",
+  success: "text-success",
+  danger: "text-danger",
+  info: "text-info",
+  dark: "text-ink",
 };
 
-export function Badge({ tone = "neutral", icon, children, className }: { tone?: Tone; icon?: IconName; children: ReactNode; className?: string }) {
+/** Dot + small uppercase label. The standard way to show a state. */
+export function Status({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 h-6 px-2 rounded-full text-[12px] font-medium whitespace-nowrap", TONES[tone], className)}>
-      {icon && <Icon name={icon} size={13} />}
+    <span className={cx("inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] whitespace-nowrap", TEXT[tone], className)}>
+      <span className={cx("w-1.5 h-1.5 rounded-full shrink-0", DOT[tone])} />
       {children}
     </span>
   );
 }
 
-const SENDER_META: Record<Sender, { label: string; tone: Tone; icon: IconName }> = {
-  customer: { label: "Customer", tone: "neutral", icon: "user" },
-  ai: { label: "AI", tone: "ai", icon: "bot" },
-  team: { label: "Team", tone: "accent", icon: "user" },
-  phone: { label: "Phone", tone: "phone", icon: "phone" },
-  history: { label: "Earlier", tone: "neutral", icon: "history" },
-};
-
-/** Text badge naming who sent a message. Colour is never the only signal. */
-export function SenderBadge({ sender, name }: { sender: Sender; name?: string }) {
-  const m = SENDER_META[sender];
+/** Boxed status for headers and cards where it needs more weight. */
+export function StatusBox({ tone = "neutral", icon, children }: { tone?: Tone; icon?: IconName; children: ReactNode }) {
+  const bg: Record<Tone, string> = {
+    neutral: "bg-sunken border-line",
+    attention: "bg-attention-tint border-attention/25",
+    success: "bg-success-tint border-success/25",
+    danger: "bg-danger-tint border-danger/25",
+    info: "bg-info-tint border-info/25",
+    dark: "bg-ink border-ink text-white",
+  };
   return (
-    <Badge tone={m.tone} icon={m.icon} className="h-5 text-[11px] px-1.5">
-      {sender === "team" && name ? name : m.label}
-    </Badge>
+    <span className={cx("inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10.5px] font-bold uppercase tracking-[0.08em] whitespace-nowrap", bg[tone], tone !== "dark" && TEXT[tone])}>
+      {icon && <Icon name={icon} size={12} />}
+      {children}
+    </span>
   );
 }
 
-/** Pill showing time left in the 24-hour reply window. */
-export function WindowTimer({ msLeft, compact }: { msLeft: number | null; compact?: boolean }) {
-  if (msLeft === null) {
-    return (
-      <Badge tone="neutral" icon="clock" className={compact ? "h-5 text-[11px] px-1.5" : undefined}>
-        {compact ? "Closed" : "Window closed · template only"}
-      </Badge>
-    );
-  }
+/** Neutral tag, e.g. customer labels. */
+export function Tag({ children, onRemove }: { children: ReactNode; onRemove?: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 h-6 pl-2 pr-2 rounded-md border border-line bg-surface text-[11.5px] font-medium text-ink-soft whitespace-nowrap">
+      {children}
+      {onRemove && (
+        <button onClick={onRemove} className="-mr-1 w-5 h-5 rounded hover:bg-sunken flex items-center justify-center" aria-label={`Remove ${children}`}>
+          <Icon name="close" size={11} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+const SENDER_LABEL: Record<Sender, string> = {
+  customer: "Customer",
+  ai: "AI",
+  team: "Team",
+  phone: "Phone app",
+  history: "Imported",
+};
+const SENDER_ICON: Record<Sender, IconName> = { customer: "user", ai: "bot", team: "user", phone: "phone", history: "history" };
+
+export function SenderLabel({ sender }: { sender: Sender }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
+      <Icon name={SENDER_ICON[sender]} size={11} />
+      {SENDER_LABEL[sender]}
+    </span>
+  );
+}
+
+/** Time left in Meta's free 24-hour reply window. */
+export function WindowTimer({ msLeft, long }: { msLeft: number | null; long?: boolean }) {
+  if (msLeft === null) return <Status tone="neutral">{long ? "Reply window closed · template only" : "Window closed"}</Status>;
   const urgent = msLeft < 2 * 60 * 60 * 1000;
   return (
-    <Badge tone={urgent ? "attention" : "neutral"} icon="clock" className={compact ? "h-5 text-[11px] px-1.5" : undefined}>
-      {formatDuration(msLeft)}
-      {!compact && " left to reply free"}
-    </Badge>
+    <Status tone={urgent ? "attention" : "neutral"}>
+      {formatDuration(msLeft)} {long ? "left in free reply window" : "left"}
+    </Status>
   );
 }
 
-export function Avatar({ name, phone, size = 40 }: { name: string | null; phone: string; size?: number }) {
+// ── Layout pieces ────────────────────────────────────────────────────────
+
+export function Avatar({ name, phone, size = 36 }: { name: string | null; phone: string; size?: number }) {
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full bg-sunken text-ink-soft font-semibold shrink-0 border border-line"
-      style={{ width: size, height: size, fontSize: size * 0.34 }}
+      className="inline-flex items-center justify-center rounded-full bg-sunken text-ink font-semibold shrink-0 border border-line"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.33) }}
       aria-hidden="true"
     >
       {initials(name, phone)}
@@ -176,33 +193,111 @@ export function Avatar({ name, phone, size = 40 }: { name: string | null; phone:
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("bg-surface border border-line rounded-[12px]", className)}>{children}</div>;
+  return <div className={cx("bg-surface border border-line rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>{children}</div>;
 }
 
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return <h3 className="text-[13px] font-semibold text-ink-soft mb-2">{children}</h3>;
-}
-
-/** Empty state: says what to do and offers the one-tap action. */
-export function EmptyState({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: IconName;
-  title: string;
-  body: string;
-  action?: ReactNode;
-}) {
+/** Card with a header bar: uppercase title on the left, actions on the right. */
+export function Panel({ title, meta, action, children, className }: { title: string; meta?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col items-center text-center px-6 py-12 max-w-sm mx-auto">
-      <span className="w-12 h-12 rounded-full bg-accent-tint text-accent flex items-center justify-center mb-4">
-        <Icon name={icon} size={22} />
+    <Card className={cx("overflow-hidden", className)}>
+      <div className="flex items-center justify-between gap-3 px-4 h-11 border-b border-line bg-[#FCFCFC]">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="eyebrow !text-ink truncate">{title}</h2>
+          {meta}
+        </div>
+        {action}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
+  return <h3 className={cx("eyebrow mb-2", className)}>{children}</h3>;
+}
+
+/** Number tile for overview screens. The whole tile opens the list behind it. */
+export function StatTile({ label, value, sub, href, tone = "neutral", icon }: { label: string; value: ReactNode; sub?: string; href: string; tone?: Tone; icon: IconName }) {
+  const hot = tone === "attention" || tone === "danger";
+  return (
+    <Link
+      href={href}
+      className={cx(
+        "group block rounded-[14px] border p-4 transition-colors duration-150",
+        hot ? "bg-ink border-ink text-white hover:bg-accent-hover" : "bg-surface border-line hover:border-line-strong"
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <span className={cx("eyebrow", hot && "!text-white/70")}>{label}</span>
+        <Icon name={icon} size={16} className={hot ? "text-white/70" : "text-ink-faint"} />
+      </div>
+      <p className="text-[30px] font-semibold leading-none tabular mt-3">{value}</p>
+      <div className={cx("hidden sm:flex items-center justify-between mt-3 text-[12px]", hot ? "text-white/70" : "text-ink-faint")}>
+        <span className="truncate">{sub}</span>
+        <Icon name="chevron" size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </Link>
+  );
+}
+
+/** Underlined tabs with counts, for filtering a list. */
+export function FilterTabs<T extends string>({ items, active, hrefFor, label }: { items: { id: T; label: string; count?: number }[]; active: T; hrefFor: (id: T) => string; label: string }) {
+  return (
+    <nav aria-label={label} className="flex gap-5 overflow-x-auto px-4 border-b border-line [scrollbar-width:none]">
+      {items.map((it) => {
+        const on = it.id === active;
+        return (
+          <Link
+            key={it.id}
+            href={hrefFor(it.id)}
+            scroll={false}
+            aria-current={on ? "page" : undefined}
+            className={cx(
+              "relative h-10 inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap transition-colors",
+              on ? "text-ink font-semibold" : "text-ink-faint font-medium hover:text-ink"
+            )}
+          >
+            {it.label}
+            {it.count !== undefined && it.count > 0 && (
+              <span className={cx("tabular text-[10.5px] font-bold min-w-[18px] h-[18px] px-1 rounded-md inline-flex items-center justify-center", on ? "bg-ink text-white" : "bg-sunken text-ink-soft")}>
+                {it.count}
+              </span>
+            )}
+            {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink rounded-full" />}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Small toggle pill used for tag filters. */
+export function Chip({ active, children, onClick }: { active?: boolean; children: ReactNode; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cx(
+        "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold whitespace-nowrap border transition-colors",
+        active ? "bg-ink text-white border-ink" : "bg-surface text-ink-soft border-line-strong hover:text-ink"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Empty state: short, says what happens next, offers the one action. */
+export function EmptyState({ icon, title, body, action }: { icon: IconName; title: string; body: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center text-center px-6 py-12 max-w-xs mx-auto">
+      <span className="w-10 h-10 rounded-[10px] bg-ink text-white flex items-center justify-center mb-3">
+        <Icon name={icon} size={18} />
       </span>
-      <p className="text-[17px] font-semibold text-ink">{title}</p>
-      <p className="text-[15px] text-ink-soft mt-1.5 leading-relaxed">{body}</p>
-      {action && <div className="mt-5">{action}</div>}
+      <p className="text-[14px] font-semibold text-ink">{title}</p>
+      <p className="text-[13px] text-ink-faint mt-1 leading-relaxed">{body}</p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
@@ -218,10 +313,10 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
-      <button className="absolute inset-0 bg-ink/30" aria-label="Close" onClick={onClose} />
-      <div className="absolute bottom-0 inset-x-0 max-h-[85vh] sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[360px] sm:max-h-none bg-surface rounded-t-[16px] sm:rounded-none shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-4 h-14 border-b border-line shrink-0">
-          <p className="text-[17px] font-semibold">{title}</p>
+      <button className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
+      <div className="absolute bottom-0 inset-x-0 max-h-[88vh] sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[380px] sm:max-h-none bg-surface rounded-t-[20px] sm:rounded-none shadow-[0_30px_70px_-15px_rgba(0,0,0,0.45)] flex flex-col">
+        <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-line shrink-0">
+          <p className="eyebrow !text-ink">{title}</p>
           <IconButton icon="close" label="Close" onClick={onClose} />
         </div>
         <div className="overflow-y-auto flex-1">{children}</div>
@@ -233,10 +328,20 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 export function Spinner({ size = 18 }: { size?: number }) {
   return (
     <span
-      className="inline-block rounded-full border-2 border-line border-t-accent animate-spin"
+      className="inline-block rounded-full border-2 border-line border-t-ink animate-spin"
       style={{ width: size, height: size }}
       role="status"
       aria-label="Loading"
     />
+  );
+}
+
+/** Key/value row for property panels. */
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-line last:border-0">
+      <dt className="text-[12.5px] text-ink-faint shrink-0">{label}</dt>
+      <dd className="text-[13px] text-ink font-medium text-right min-w-0 break-words">{children}</dd>
+    </div>
   );
 }
