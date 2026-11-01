@@ -7,7 +7,7 @@ import { Icon } from "../icons";
 const BUBBLE: Record<Sender, string> = {
   customer: "bg-surface border border-line text-ink",
   ai: "bg-sunken border border-line text-ink",
-  team: "bg-ink text-white",
+  team: "bg-brand text-white",
   phone: "bg-phone-tint border border-[#D6DEE9] text-ink",
   history: "bg-sunken text-ink-soft",
 };

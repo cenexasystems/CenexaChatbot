@@ -14,7 +14,7 @@ export default function AssistantPage() {
   return (
     <Page wide section="Automation" title="AI Assistant" subtitle="Status and configuration">
       <div className="grid lg:grid-cols-[1fr_1fr] gap-5">
-        <Panel title="Live status" action={<Status tone="success">Running</Status>}>
+        <Panel title="Live status" icon="bot" action={<Status tone="success">Running</Status>}>
           <div className="grid grid-cols-3 divide-x divide-line">
             <Stat n={handling} label="AI replying" href="/inbox?filter=ai" />
             <Stat n={paused} label="Paused" href="/inbox?filter=needs-you" />
@@ -22,7 +22,7 @@ export default function AssistantPage() {
           </div>
         </Panel>
 
-        <Panel title="Configuration">
+        <Panel title="Configuration" icon="settings">
           <dl className="px-4 py-1">
             <Field label="Pause after phone reply">{business?.handoff_minutes !== undefined ? `${business.handoff_minutes} min` : "—"}</Field>
             <Field label="Voice notes and photos">
@@ -36,7 +36,7 @@ export default function AssistantPage() {
         </Panel>
       </div>
 
-      <Panel className="mt-5" title="Roadmap">
+      <Panel className="mt-5" title="Roadmap" icon="flow">
         <Roadmap
           items={[
             { icon: "note", title: "Instruction editor", body: "Edit tone, products, prices and timings yourself." },

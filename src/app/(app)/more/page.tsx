@@ -38,7 +38,7 @@ export default function MorePage() {
     <Page wide section="System" title="Settings" subtitle={business?.name}>
       <div className="grid lg:grid-cols-2 gap-5">
         {groups.map((g) => (
-          <Panel key={g.title} title={g.title}>
+          <Panel key={g.title} title={g.title} icon={g.title === "Operations" ? "chart" : "wallet"}>
             <ul className="divide-y divide-line">
               {g.items.map((it) => (
                 <li key={it.label}><Row {...it} /></li>
@@ -47,7 +47,7 @@ export default function MorePage() {
           </Panel>
         ))}
 
-        <Panel title="Language">
+        <Panel title="Language" icon="globe">
           <div className="p-4">
             <div className="inline-flex border border-line-strong rounded-[10px] p-0.5" role="radiogroup" aria-label="Language">
               {([
@@ -59,7 +59,7 @@ export default function MorePage() {
                   role="radio"
                   aria-checked={lang === code}
                   onClick={() => setLang(code)}
-                  className={cx("h-9 px-5 rounded-[8px] text-[13px] font-semibold", lang === code ? "bg-ink text-white" : "text-ink-soft hover:text-ink")}
+                  className={cx("h-9 px-5 rounded-[8px] text-[13px] font-semibold", lang === code ? "bg-brand text-white shadow-brand" : "text-ink-soft hover:text-ink")}
                 >
                   {label}
                 </button>
@@ -69,7 +69,7 @@ export default function MorePage() {
           </div>
         </Panel>
 
-        <Panel title="Session">
+        <Panel title="Session" icon="user">
           <ul className="divide-y divide-line">
             <li>
               <Link href="/" className="flex items-center gap-3 px-4 h-12 hover:bg-canvas text-[13px] font-medium">

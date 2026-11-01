@@ -134,7 +134,7 @@ export function DetailsPanel({
           ))}
         </div>
         <form onSubmit={(e) => { e.preventDefault(); addTag(); }} className="flex gap-2">
-          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Add tag" className="flex-1 min-w-0 h-8 px-2.5 rounded-lg border border-line-strong text-[12.5px] placeholder:text-ink-faint focus:outline-none focus:border-ink" aria-label="New tag" />
+          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Add tag" className="flex-1 min-w-0 h-8 px-2.5 rounded-lg border border-line-strong text-[12.5px] placeholder:text-ink-faint focus:outline-none focus:border-accent" aria-label="New tag" />
           <Button type="submit" size="sm" disabled={!tag.trim()}>Add</Button>
         </form>
       </section>
@@ -146,7 +146,7 @@ export function DetailsPanel({
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           placeholder="Visible to your team only"
-          className="w-full px-2.5 py-2 rounded-lg border border-line-strong text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-ink resize-y"
+          className="w-full px-2.5 py-2 rounded-lg border border-line-strong text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-accent resize-y"
         />
         {noteDirty && (
           <div className="flex justify-end gap-2 mt-2">

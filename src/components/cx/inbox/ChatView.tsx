@@ -235,13 +235,13 @@ export function ChatView({ id }: { id: string }) {
                 }
               }}
               placeholder={image ? "Caption (optional)" : `Reply as ${business?.name ?? "business"}…`}
-              className="flex-1 min-h-10 max-h-[140px] px-3 py-2 rounded-[10px] border border-line-strong bg-surface text-[14px] leading-snug placeholder:text-ink-faint resize-none focus:outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+              className="flex-1 min-h-10 max-h-[140px] px-3 py-2 rounded-[10px] border border-line-strong bg-surface text-[14px] leading-snug placeholder:text-ink-faint resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
               aria-label="Message"
             />
             <button
               onClick={handleSend}
               disabled={sending || (!text.trim() && !image)}
-              className="h-10 px-4 rounded-[10px] bg-ink text-white flex items-center gap-2 shrink-0 text-[12px] font-bold uppercase tracking-[0.08em] hover:bg-accent-hover disabled:opacity-30 transition-colors"
+              className="h-10 px-4 rounded-[10px] bg-brand shadow-brand text-white flex items-center gap-2 shrink-0 text-[12px] font-bold uppercase tracking-[0.08em] hover:brightness-110 disabled:opacity-30 transition-colors"
               aria-label="Send"
             >
               {sending ? <Spinner size={14} /> : <Icon name="send" size={15} />}
@@ -265,7 +265,7 @@ export function ChatView({ id }: { id: string }) {
           role="status"
           className={cx(
             "fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-[60] max-w-[90vw] pl-3 pr-4 h-11 rounded-[12px] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.45)] text-[13px] font-medium flex items-center gap-2",
-            toast.tone === "ok" ? "bg-ink text-white" : "bg-danger text-white"
+            toast.tone === "ok" ? "bg-brand-navy text-white" : "bg-danger text-white"
           )}
         >
           <Icon name={toast.tone === "ok" ? "check" : "alert"} size={16} />
@@ -287,7 +287,7 @@ function ModeSwitch({ mode, onChange }: { mode: "agent" | "human"; onChange: (m:
           onClick={() => mode !== m && onChange(m)}
           className={cx(
             "h-8 px-2.5 sm:px-3 rounded-[8px] text-[11px] font-bold uppercase tracking-[0.08em] flex items-center gap-1.5 transition-colors",
-            mode === m ? "bg-ink text-white" : "text-ink-faint hover:text-ink"
+            mode === m ? "bg-brand text-white shadow-brand" : "text-ink-faint hover:text-ink"
           )}
         >
           <Icon name={m === "agent" ? "bot" : "user"} size={14} />
@@ -301,7 +301,7 @@ function ModeSwitch({ mode, onChange }: { mode: "agent" | "human"; onChange: (m:
 function Bar({ label, icon, children }: { label: string; icon: "phone" | "user"; children: React.ReactNode }) {
   return (
     <div className="shrink-0 flex items-center gap-3 px-4 py-2 text-[12.5px] text-ink-soft border-b border-line bg-surface">
-      <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-ink text-white text-[10px] font-bold uppercase tracking-[0.1em] shrink-0">
+      <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-brand-navy text-white text-[10px] font-bold uppercase tracking-[0.1em] shrink-0">
         <Icon name={icon} size={12} />
         {label}
       </span>

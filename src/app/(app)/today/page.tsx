@@ -56,7 +56,7 @@ export default function TodayPage() {
 
       <Panel
         className="mt-5"
-        title="Reply queue"
+        title="Reply queue" icon="inbox"
         meta={queue.length > 0 && <span className="text-[11px] font-bold text-ink-faint tabular">{queue.length}</span>}
         action={queue.length > 0 && <Link href="/inbox?filter=needs-you" className="text-[12px] font-semibold text-ink hover:underline underline-offset-2">View all</Link>}
       >
@@ -107,7 +107,7 @@ export default function TodayPage() {
       </Panel>
 
       {conversations.length === 0 && (
-        <Panel className="mt-5" title="Setup">
+        <Panel className="mt-5" title="Setup" icon="check">
           <ul className="divide-y divide-line text-[13px]">
             <li className="flex items-center gap-3 px-4 py-3"><Status tone="success">Done</Status> WhatsApp number connected</li>
             <li className="flex items-center gap-3 px-4 py-3"><Status>To do</Status> Share your WhatsApp link or QR with customers</li>

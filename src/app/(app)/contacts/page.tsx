@@ -40,7 +40,7 @@ export default function ContactsPage() {
       action={<Button icon="upload" disabled title="Coming soon">Import CSV</Button>}
     >
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <label className="flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface sm:w-80 focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10">
+        <label className="flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface sm:w-80 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
           <Icon name="search" size={16} className="text-ink-faint" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or number" className="flex-1 bg-transparent text-[13px] focus:outline-none placeholder:text-ink-faint" aria-label="Search contacts" />
         </label>
@@ -56,7 +56,7 @@ export default function ContactsPage() {
         )}
       </div>
 
-      <Panel className="mt-4" title="All contacts" meta={<span className="text-[11px] font-bold text-ink-faint tabular">{list.length}</span>}>
+      <Panel className="mt-4" title="All contacts" icon="contacts" meta={<span className="text-[11px] font-bold text-ink-faint tabular">{list.length}</span>}>
         {list.length === 0 ? (
           <EmptyState icon="contacts" title={q || tag ? "No matches" : "No contacts"} body={q || tag ? "Try another name, number or tag." : "Customers are added automatically when they message you."} />
         ) : (
@@ -94,7 +94,7 @@ export default function ContactsPage() {
         )}
       </Panel>
 
-      <Panel className="mt-5" title="Roadmap">
+      <Panel className="mt-5" title="Roadmap" icon="flow">
         <Roadmap
           items={[
             { icon: "upload", title: "Import contacts", body: "CSV upload, phone-app contact sync, and old broadcast lists as groups." },

@@ -16,7 +16,7 @@ export function cx(...c: (string | false | null | undefined)[]) {
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent-hover shadow-[0_1px_2px_rgba(0,0,0,0.25)]",
+  primary: "bg-brand text-white shadow-brand hover:brightness-110",
   secondary: "bg-surface text-ink border border-line-strong hover:bg-sunken",
   ghost: "text-ink-soft hover:bg-sunken hover:text-ink",
   danger: "bg-surface text-danger border border-line-strong hover:bg-danger-tint hover:border-danger/40",
@@ -96,7 +96,7 @@ const DOT: Record<Tone, string> = {
   success: "bg-success",
   danger: "bg-danger",
   info: "bg-info",
-  dark: "bg-ink",
+  dark: "bg-accent",
 };
 const TEXT: Record<Tone, string> = {
   neutral: "text-ink-soft",
@@ -104,7 +104,7 @@ const TEXT: Record<Tone, string> = {
   success: "text-success",
   danger: "text-danger",
   info: "text-info",
-  dark: "text-ink",
+  dark: "text-accent",
 };
 
 /** Dot + small uppercase label. The standard way to show a state. */
@@ -125,7 +125,7 @@ export function StatusBox({ tone = "neutral", icon, children }: { tone?: Tone; i
     success: "bg-success-tint border-success/25",
     danger: "bg-danger-tint border-danger/25",
     info: "bg-info-tint border-info/25",
-    dark: "bg-ink border-ink text-white",
+    dark: "bg-brand border-transparent text-white",
   };
   return (
     <span className={cx("inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10.5px] font-bold uppercase tracking-[0.08em] whitespace-nowrap", bg[tone], tone !== "dark" && TEXT[tone])}>
@@ -193,16 +193,17 @@ export function Avatar({ name, phone, size = 36 }: { name: string | null; phone:
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("bg-surface border border-line rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>{children}</div>;
+  return <div className={cx("bg-surface border border-line rounded-[16px] shadow-[0_1px_3px_rgba(10,31,68,0.06)]", className)}>{children}</div>;
 }
 
 /** Card with a header bar: uppercase title on the left, actions on the right. */
-export function Panel({ title, meta, action, children, className }: { title: string; meta?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({ title, icon, meta, action, children, className }: { title: string; icon?: IconName; meta?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <Card className={cx("overflow-hidden", className)}>
-      <div className="flex items-center justify-between gap-3 px-4 h-11 border-b border-line bg-[#FCFCFC]">
-        <div className="flex items-center gap-2 min-w-0">
-          <h2 className="eyebrow !text-ink truncate">{title}</h2>
+      <div className="flex items-center justify-between gap-3 px-5 h-14 border-b border-line">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {icon && <Icon name={icon} size={18} className="text-accent shrink-0" />}
+          <h2 className="heading text-[15.5px] truncate">{title}</h2>
           {meta}
         </div>
         {action}
@@ -224,7 +225,7 @@ export function StatTile({ label, value, sub, href, tone = "neutral", icon }: { 
       href={href}
       className={cx(
         "group block rounded-[14px] border p-4 transition-colors duration-150",
-        hot ? "bg-ink border-ink text-white hover:bg-accent-hover" : "bg-surface border-line hover:border-line-strong"
+        hot ? "bg-brand border-transparent text-white shadow-brand hover:brightness-110" : "bg-surface border-line hover:border-line-strong"
       )}
     >
       <div className="flex items-center justify-between">
@@ -254,16 +255,16 @@ export function FilterTabs<T extends string>({ items, active, hrefFor, label }: 
             aria-current={on ? "page" : undefined}
             className={cx(
               "relative h-10 inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap transition-colors",
-              on ? "text-ink font-semibold" : "text-ink-faint font-medium hover:text-ink"
+              on ? "text-accent font-bold" : "text-ink-faint font-medium hover:text-ink"
             )}
           >
             {it.label}
             {it.count !== undefined && it.count > 0 && (
-              <span className={cx("tabular text-[10.5px] font-bold min-w-[18px] h-[18px] px-1 rounded-md inline-flex items-center justify-center", on ? "bg-ink text-white" : "bg-sunken text-ink-soft")}>
+              <span className={cx("tabular text-[10.5px] font-bold min-w-[18px] h-[18px] px-1 rounded-md inline-flex items-center justify-center", on ? "bg-accent text-white" : "bg-sunken text-ink-soft")}>
                 {it.count}
               </span>
             )}
-            {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink rounded-full" />}
+            {on && <span className="absolute left-0 right-0 -bottom-px h-[3px] bg-brand rounded-full" />}
           </Link>
         );
       })}
@@ -280,7 +281,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
       aria-pressed={active}
       className={cx(
         "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold whitespace-nowrap border transition-colors",
-        active ? "bg-ink text-white border-ink" : "bg-surface text-ink-soft border-line-strong hover:text-ink"
+        active ? "bg-accent text-white border-accent" : "bg-surface text-ink-soft border-line-strong hover:text-ink"
       )}
     >
       {children}
@@ -292,7 +293,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
 export function EmptyState({ icon, title, body, action }: { icon: IconName; title: string; body: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center text-center px-6 py-12 max-w-xs mx-auto">
-      <span className="w-10 h-10 rounded-[10px] bg-ink text-white flex items-center justify-center mb-3">
+      <span className="w-11 h-11 rounded-[12px] bg-brand text-white shadow-brand flex items-center justify-center mb-3">
         <Icon name={icon} size={18} />
       </span>
       <p className="text-[14px] font-semibold text-ink">{title}</p>
@@ -313,7 +314,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
-      <button className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
+      <button className="absolute inset-0 bg-brand-navy/40" aria-label="Close" onClick={onClose} />
       <div className="absolute bottom-0 inset-x-0 max-h-[88vh] sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[380px] sm:max-h-none bg-surface rounded-t-[20px] sm:rounded-none shadow-[0_30px_70px_-15px_rgba(0,0,0,0.45)] flex flex-col">
         <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-line shrink-0">
           <p className="eyebrow !text-ink">{title}</p>
@@ -328,7 +329,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 export function Spinner({ size = 18 }: { size?: number }) {
   return (
     <span
-      className="inline-block rounded-full border-2 border-line border-t-ink animate-spin"
+      className="inline-block rounded-full border-2 border-line border-t-accent animate-spin"
       style={{ width: size, height: size }}
       role="status"
       aria-label="Loading"

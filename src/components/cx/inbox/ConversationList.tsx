@@ -64,10 +64,10 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
     <div className="h-full flex flex-col bg-surface">
       <div className="shrink-0 px-4 pt-4 pb-3">
         <div className="flex items-baseline justify-between">
-          <h1 className="text-[18px] font-semibold leading-tight">{t("nav.inbox")}</h1>
+          <h1 className="heading text-[20px] leading-tight">{t("nav.inbox")}</h1>
           <span className="eyebrow tabular">{conversations.length} chats</span>
         </div>
-        <label className="mt-3 flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10 transition">
+        <label className="mt-3 flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15 transition">
           <Icon name="search" size={16} className="text-ink-faint shrink-0" />
           <input
             value={query}
@@ -133,9 +133,9 @@ function Row({ convo: c, selected, href, now }: { convo: ConversationWithLastMes
     <Link
       href={href}
       aria-current={selected ? "true" : undefined}
-      className={cx("relative flex gap-3 pl-4 pr-3 py-3 transition-colors duration-150", selected ? "bg-sunken" : "hover:bg-canvas")}
+      className={cx("relative flex gap-3 pl-4 pr-3 py-3 transition-colors duration-150", selected ? "bg-accent-tint" : "hover:bg-canvas")}
     >
-      {selected && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-ink" />}
+      {selected && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-brand" />}
       <Avatar name={c.name} phone={c.phone} size={38} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">

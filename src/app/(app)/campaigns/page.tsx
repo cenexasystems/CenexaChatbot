@@ -5,10 +5,10 @@ import { Button, EmptyState, Panel } from "@/components/cx/ui";
 export default function CampaignsPage() {
   return (
     <Page wide section="Marketing" title="Campaigns" subtitle="Template broadcasts to customer groups" action={<Button variant="primary" icon="plus" disabled title="Coming soon">New campaign</Button>}>
-      <Panel title="Campaigns">
+      <Panel title="Campaigns" icon="campaigns">
         <EmptyState icon="campaigns" title="No campaigns yet" body="Campaigns are not available yet. They will appear here once enabled for your account." />
       </Panel>
-      <Panel className="mt-5" title="Roadmap">
+      <Panel className="mt-5" title="Roadmap" icon="flow">
         <Roadmap
           items={[
             { icon: "rupee", title: "Cost preview", body: "Audience size, Meta charge and Cenexa fee as separate lines before sending. Test send to your own number." },
