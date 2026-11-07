@@ -28,7 +28,7 @@ type Ctx = {
   sendImage: (id: string, file: File, caption: string) => Promise<void>;
   sendQR: (id: string, newQrFile?: File) => Promise<void>;
   patch: (id: string, p: Patch) => Promise<boolean>;
-  resumeAI: (id: string) => Promise<void>;
+  changeMode: (id: string, mode: "agent" | "human") => Promise<boolean>;
   verifyPayment: (id: string, status: "verified" | "rejected") => Promise<{ ok: boolean; message: string }>;
   deleteMessage: (id: string, msgId: string) => Promise<void>;
 };
@@ -304,11 +304,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [conversations, updateConvo]
   );
 
-  const resumeAI = useCallback(
-    async (id: string) => {
-      await patch(id, { ai_paused_until: null, mode: "agent" });
+  const changeMode = useCallback(
+    async (id: string, mode: "agent" | "human") => {
+      if (DEMO_MODE) {
+        updateConvo(id, { mode, ...(mode === "agent" ? { ai_paused_until: null } : {}) });
+        return true;
+      }
+      try {
+        const response = await fetch(`/api/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mode === "agent" ? { mode, ai_paused_until: null } : { mode }),
+        });
+        if (!response.ok) return false;
+        updateConvo(id, { mode, ...(mode === "agent" ? { ai_paused_until: null } : {}) });
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [patch]
+    [updateConvo]
   );
 
   const verifyPayment = useCallback(
@@ -360,7 +375,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     sendImage,
     sendQR,
     patch,
-    resumeAI,
+    changeMode,
     verifyPayment,
     deleteMessage,
   };

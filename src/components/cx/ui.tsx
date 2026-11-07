@@ -110,7 +110,7 @@ const TEXT: Record<Tone, string> = {
 /** Dot + small uppercase label. The standard way to show a state. */
 export function Status({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] whitespace-nowrap", TEXT[tone], className)}>
+    <span className={cx("inline-flex items-center gap-1.5 text-[11.5px] font-extrabold uppercase tracking-[0.07em] whitespace-nowrap", TEXT[tone], className)}>
       <span className={cx("w-1.5 h-1.5 rounded-full shrink-0", DOT[tone])} />
       {children}
     </span>
@@ -128,7 +128,7 @@ export function StatusBox({ tone = "neutral", icon, children }: { tone?: Tone; i
     dark: "bg-brand border-transparent text-white",
   };
   return (
-    <span className={cx("inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10.5px] font-bold uppercase tracking-[0.08em] whitespace-nowrap", bg[tone], tone !== "dark" && TEXT[tone])}>
+    <span className={cx("inline-flex items-center gap-1.5 min-h-7 px-2 rounded-md border text-[11.5px] font-extrabold uppercase tracking-[0.07em] whitespace-nowrap", bg[tone], tone !== "dark" && TEXT[tone])}>
       {icon && <Icon name={icon} size={12} />}
       {children}
     </span>
@@ -229,11 +229,11 @@ export function StatTile({ label, value, sub, href, tone = "neutral", icon }: { 
       )}
     >
       <div className="flex items-center justify-between">
-        <span className={cx("eyebrow", hot && "!text-white/70")}>{label}</span>
+        <span className={cx("eyebrow", hot && "!text-white/80")}>{label}</span>
         <Icon name={icon} size={16} className={hot ? "text-white/70" : "text-ink-faint"} />
       </div>
-      <p className="text-[30px] font-semibold leading-none tabular mt-3">{value}</p>
-      <div className={cx("hidden sm:flex items-center justify-between mt-3 text-[12px]", hot ? "text-white/70" : "text-ink-faint")}>
+      <p className="text-[31px] font-bold leading-none tabular mt-3">{value}</p>
+      <div className={cx("hidden sm:flex items-center justify-between mt-3 text-[12.5px] font-medium", hot ? "text-white/80" : "text-ink-faint")}>
         <span className="truncate">{sub}</span>
         <Icon name="chevron" size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
@@ -244,7 +244,7 @@ export function StatTile({ label, value, sub, href, tone = "neutral", icon }: { 
 /** Underlined tabs with counts, for filtering a list. */
 export function FilterTabs<T extends string>({ items, active, hrefFor, label }: { items: { id: T; label: string; count?: number }[]; active: T; hrefFor: (id: T) => string; label: string }) {
   return (
-    <nav aria-label={label} className="flex gap-5 overflow-x-auto px-4 border-b border-line [scrollbar-width:none]">
+    <nav aria-label={label} className="flex flex-wrap gap-x-4 px-4 border-b border-line">
       {items.map((it) => {
         const on = it.id === active;
         return (

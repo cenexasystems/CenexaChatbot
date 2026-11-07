@@ -98,8 +98,8 @@
   --color-line: #E2E8F1;
   --color-line-strong: #C9D3E1;
   --color-ink: #1A1D2E;
-  --color-ink-soft: #475266;
-  --color-ink-faint: #667085;
+  --color-ink-soft: #39485f;
+  --color-ink-faint: #53627a;
   --color-accent: #0B5BD3;
   --color-accent-hover: #0A4CB3;
   --color-accent-tint: #E8F1FD;
@@ -124,7 +124,8 @@
   font-family: var(--font-poppins), var(--font-noto-tamil), system-ui, -apple-system, sans-serif;
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
@@ -168,11 +169,11 @@
 .cx-root .tabular { font-variant-numeric: tabular-nums; }
 /* Small bold uppercase label used for section and column headings. */
 .cx-root .eyebrow {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--color-ink-faint);
+  color: #53627a;
   line-height: 1.2;
 }
 /* Wide geometric face matching the CENEXA logotype. */

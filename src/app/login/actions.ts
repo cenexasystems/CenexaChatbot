@@ -48,8 +48,8 @@ export async function login(formData: FormData) {
       }
       redirect("/");
     }
-  } catch (err: any) {
-    if (err.message && err.message.includes("NEXT_REDIRECT")) {
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) {
       throw err;
     }
     console.error("Login profile check error:", err);
