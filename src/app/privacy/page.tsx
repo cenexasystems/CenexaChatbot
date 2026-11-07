@@ -14,9 +14,9 @@ export default function PrivacyPage() {
       style={{
         fontFamily:
           "'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        background: "linear-gradient(135deg, #EFF7FC 0%, #FFFFFF 50%, #EFF7FC 100%)",
         minHeight: "100vh",
-        color: "#e2e8f0",
+        color: "#17263B",
         padding: "0",
         margin: "0",
       }}
@@ -24,8 +24,8 @@ export default function PrivacyPage() {
       {/* Header */}
       <header
         style={{
-          background: "rgba(255,255,255,0.04)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(255,255,255,0.92)",
+          borderBottom: "1px solid #D7E4F0",
           padding: "20px 40px",
           display: "flex",
           alignItems: "center",
@@ -38,13 +38,13 @@ export default function PrivacyPage() {
           style={{
             width: "42px",
             height: "42px",
-            background: "linear-gradient(135deg, #25D366, #128C7E)",
+            background: "linear-gradient(135deg, #0B3B8C, #078BCB)",
             borderRadius: "12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            boxShadow: "0 4px 15px rgba(37,211,102,0.35)",
+            boxShadow: "0 4px 15px rgba(7,139,203,0.2)",
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
@@ -56,13 +56,13 @@ export default function PrivacyPage() {
             style={{
               fontSize: "18px",
               fontWeight: "700",
-              color: "#f1f5f9",
+              color: "#17263B",
               letterSpacing: "-0.3px",
             }}
           >
             Cenexa Systems
           </div>
-          <div style={{ fontSize: "13px", color: "#94a3b8" }}>Cenexa Chatflow</div>
+          <div style={{ fontSize: "13px", color: "#64748B" }}>Cenexa Chatflow</div>
         </div>
       </header>
 
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
             padding: "6px 16px",
             fontSize: "12px",
             fontWeight: "600",
-            color: "#a5b4fc",
+            color: "#087DBB",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             marginBottom: "20px",
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
           style={{
             fontSize: "clamp(32px, 5vw, 52px)",
             fontWeight: "800",
-            background: "linear-gradient(135deg, #f1f5f9 0%, #a5b4fc 100%)",
+            background: "linear-gradient(135deg, #17263B 0%, #087DBB 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -108,8 +108,8 @@ export default function PrivacyPage() {
         >
           Privacy Policy
         </h1>
-        <p style={{ color: "#94a3b8", fontSize: "16px", margin: "0" }}>
-          Last Updated: <strong style={{ color: "#cbd5e1" }}>{lastUpdated}</strong>
+        <p style={{ color: "#64748B", fontSize: "16px", margin: "0" }}>
+          Last Updated: <strong style={{ color: "#475569" }}>{lastUpdated}</strong>
         </p>
       </div>
 
@@ -124,9 +124,9 @@ export default function PrivacyPage() {
         {/* Intro card */}
         <Section>
           <p style={bodyText}>
-            Welcome to <strong style={{ color: "#a5b4fc" }}>Cenexa Chatflow</strong>{" "}
+            Welcome to <strong style={{ color: "#087DBB" }}>Cenexa Chatflow</strong>{" "}
             (&quot;the Application&quot; or &quot;the App&quot;). This Privacy Policy describes how{" "}
-            <strong style={{ color: "#f1f5f9" }}>Cenexa Systems</strong> (&quot;we&quot;,
+            <strong style={{ color: "#17263B" }}>Cenexa Systems</strong> (&quot;we&quot;,
             &quot;us&quot;, or &quot;our&quot;) collects, uses, shares, and protects information about
             you when you use our Cenexa Chatflow application and its associated dashboard.
           </p>
@@ -140,9 +140,9 @@ export default function PrivacyPage() {
         <SectionTitle>1. About Cenexa Systems &amp; This Application</SectionTitle>
         <Section>
           <p style={bodyText}>
-            <strong style={{ color: "#f1f5f9" }}>Cenexa Systems</strong> is a technology services
+            <strong style={{ color: "#17263B" }}>Cenexa Systems</strong> is a technology services
             business that builds and operates AI-powered automation tools.{" "}
-            <strong style={{ color: "#a5b4fc" }}>Cenexa Chatflow</strong> is a business application
+            <strong style={{ color: "#087DBB" }}>Cenexa Chatflow</strong> is a business application
             that allows our clients to manage WhatsApp-based customer conversations through an
             AI-assisted dashboard. The App integrates with Meta&apos;s WhatsApp Business Platform API
             and uses Meta Login / Facebook Login to authenticate business operators.
@@ -173,21 +173,21 @@ export default function PrivacyPage() {
           </p>
           <ul style={listStyle}>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>WhatsApp messages:</strong> Content of messages
+              <strong style={{ color: "#17263B" }}>WhatsApp messages:</strong> Content of messages
               exchanged between your business WhatsApp number and your customers via Cenexa Chatflow,
               including text, images, and documents, transmitted through Meta&apos;s WhatsApp Business Cloud API.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Sender information:</strong> WhatsApp phone numbers
+              <strong style={{ color: "#17263B" }}>Sender information:</strong> WhatsApp phone numbers
               of customers who message your business.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Facebook / Meta user profile:</strong> Public
+              <strong style={{ color: "#17263B" }}>Facebook / Meta user profile:</strong> Public
               profile information (name, email address, profile picture) if you use Facebook Login to
               authenticate as a dashboard operator.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>WhatsApp Business Account metadata:</strong>{" "}
+              <strong style={{ color: "#17263B" }}>WhatsApp Business Account metadata:</strong>{" "}
               Business display name and phone number ID associated with your WhatsApp Business Account.
             </li>
           </ul>
@@ -207,30 +207,30 @@ export default function PrivacyPage() {
           </p>
           <ul style={listStyle}>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>To provide the Service:</strong> Displaying
+              <strong style={{ color: "#17263B" }}>To provide the Service:</strong> Displaying
               WhatsApp conversations in the Cenexa Chatflow dashboard, enabling AI-assisted responses,
               and managing business-customer communication.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Authentication &amp; Security:</strong> Verifying
+              <strong style={{ color: "#17263B" }}>Authentication &amp; Security:</strong> Verifying
               the identity of dashboard operators and protecting accounts from unauthorised access.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>AI Agent Processing:</strong> Feeding conversation
+              <strong style={{ color: "#17263B" }}>AI Agent Processing:</strong> Feeding conversation
               context to the AI model so it can generate relevant, context-aware automated responses on
               behalf of your business.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Customer Support &amp; Billing:</strong> Managing
+              <strong style={{ color: "#17263B" }}>Customer Support &amp; Billing:</strong> Managing
               your business subscription, verifying payments, and responding to support requests.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Compliance &amp; Legal Obligations:</strong>{" "}
+              <strong style={{ color: "#17263B" }}>Compliance &amp; Legal Obligations:</strong>{" "}
               Retaining records as required by applicable law.
             </li>
           </ul>
           <p style={bodyText}>
-            <strong style={{ color: "#fbbf24" }}>We do not</strong> sell, rent, trade, or otherwise
+            <strong style={{ color: "#0B5BD3" }}>We do not</strong> sell, rent, trade, or otherwise
             transfer Platform Data obtained from Meta to any third parties for advertising, profiling,
             or any purpose not described in this policy.
           </p>
@@ -248,12 +248,12 @@ export default function PrivacyPage() {
               for the business operator whose account the data belongs to.
             </li>
             <li>
-              Platform Data is <strong style={{ color: "#e2e8f0" }}>not</strong> used to discriminate
+              Platform Data is <strong style={{ color: "#17263B" }}>not</strong> used to discriminate
               against users, make eligibility determinations, conduct surveillance, or build marketing
               profiles.
             </li>
             <li>
-              Platform Data is <strong style={{ color: "#e2e8f0" }}>not</strong> shared with
+              Platform Data is <strong style={{ color: "#17263B" }}>not</strong> shared with
               third-party advertisers.
             </li>
             <li>
@@ -275,23 +275,23 @@ export default function PrivacyPage() {
           </p>
           <ul style={listStyle}>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Service Providers:</strong> We use trusted
+              <strong style={{ color: "#17263B" }}>Service Providers:</strong> We use trusted
               third-party service providers (e.g., Supabase for database hosting, OpenAI / Google
               AI for AI processing, Vercel for hosting) solely to operate the Application. These
               providers are contractually obligated to handle data securely and only for the purposes
               we specify.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Legal Requirements:</strong> We may disclose
+              <strong style={{ color: "#17263B" }}>Legal Requirements:</strong> We may disclose
               information if required by law, court order, or governmental authority.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Protection of Rights:</strong> We may disclose
+              <strong style={{ color: "#17263B" }}>Protection of Rights:</strong> We may disclose
               information to protect the rights, property, or safety of Cenexa Systems, our users, or
               the public.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Business Transfer:</strong> In the event of a
+              <strong style={{ color: "#17263B" }}>Business Transfer:</strong> In the event of a
               merger, acquisition, or sale of assets, user data may be transferred. We will notify you
               of any such change.
             </li>
@@ -327,24 +327,24 @@ export default function PrivacyPage() {
           </p>
           <ul style={listStyle}>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Access:</strong> Request a copy of the personal
+              <strong style={{ color: "#17263B" }}>Access:</strong> Request a copy of the personal
               data we hold about you.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Correction:</strong> Request correction of
+              <strong style={{ color: "#17263B" }}>Correction:</strong> Request correction of
               inaccurate or incomplete data.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Deletion:</strong> Request deletion of your
+              <strong style={{ color: "#17263B" }}>Deletion:</strong> Request deletion of your
               personal data and all Platform Data associated with your account. We will fulfil
               deletion requests within 30 days.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Portability:</strong> Request a machine-readable
+              <strong style={{ color: "#17263B" }}>Portability:</strong> Request a machine-readable
               export of your data.
             </li>
             <li>
-              <strong style={{ color: "#e2e8f0" }}>Objection:</strong> Object to certain types of
+              <strong style={{ color: "#17263B" }}>Objection:</strong> Object to certain types of
               data processing.
             </li>
           </ul>
@@ -413,16 +413,16 @@ export default function PrivacyPage() {
               marginTop: "12px",
             }}
           >
-            <p style={{ margin: "0 0 8px", color: "#f1f5f9", fontWeight: "700", fontSize: "16px" }}>
+            <p style={{ margin: "0 0 8px", color: "#17263B", fontWeight: "700", fontSize: "16px" }}>
               Cenexa Systems
             </p>
-            <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "14px" }}>
+            <p style={{ margin: "0 0 6px", color: "#64748B", fontSize: "14px" }}>
               📧{" "}
               <a href="mailto:cenexasystems@gmail.com" style={linkStyle}>
                 cenexasystems@gmail.com
               </a>
             </p>
-            <p style={{ margin: "0", color: "#94a3b8", fontSize: "14px" }}>
+            <p style={{ margin: "0", color: "#64748B", fontSize: "14px" }}>
               🌐{" "}
               <a href="https://cenexasystems.com" target="_blank" rel="noopener noreferrer" style={linkStyle}>
                 cenexasystems.com
@@ -435,7 +435,7 @@ export default function PrivacyPage() {
       {/* Footer */}
       <footer
         style={{
-          borderTop: "1px solid rgba(255,255,255,0.07)",
+          borderTop: "1px solid #D7E4F0",
           padding: "24px",
           textAlign: "center",
           color: "#475569",
@@ -459,7 +459,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: "19px",
         fontWeight: "700",
-        color: "#a5b4fc",
+        color: "#087DBB",
         margin: "40px 0 0",
         padding: "0 0 10px",
         borderBottom: "1px solid rgba(99,102,241,0.2)",
@@ -477,7 +477,7 @@ function SubTitle({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: "15px",
         fontWeight: "600",
-        color: "#cbd5e1",
+        color: "#475569",
         margin: "20px 0 8px",
       }}
     >
@@ -490,8 +490,8 @@ function Section({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "#F2F7FC",
+        border: "1px solid #D7E4F0",
         borderRadius: "14px",
         padding: "24px 28px",
         marginTop: "12px",
@@ -503,14 +503,14 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 const bodyText: React.CSSProperties = {
-  color: "#94a3b8",
+  color: "#64748B",
   lineHeight: "1.75",
   fontSize: "15px",
   margin: "0 0 14px",
 };
 
 const listStyle: React.CSSProperties = {
-  color: "#94a3b8",
+  color: "#64748B",
   lineHeight: "1.8",
   fontSize: "15px",
   paddingLeft: "22px",
@@ -518,7 +518,7 @@ const listStyle: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-  color: "#818cf8",
+  color: "#078BCB",
   textDecoration: "underline",
   textUnderlineOffset: "3px",
 };

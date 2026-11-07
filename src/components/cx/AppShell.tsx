@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <nav aria-label="Main" className="flex-1 overflow-y-auto px-4 pt-5 space-y-1.5">
           {MAIN.map((tab) => (
-            <SideItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
+            <SideItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
           ))}
         </nav>
 
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav aria-label="Main" className="hidden md:flex lg:hidden w-[76px] shrink-0 flex-col items-center bg-sidebar py-4 gap-1.5">
         <Link href="/today" className="mb-4" aria-label="Cenexa ChatFlow"><BrandMark size={44} /></Link>
         {MAIN.map((tab) => (
-          <RailItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
+          <RailItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
         ))}
       </nav>
 
@@ -119,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {MOBILE.map((tab) => {
-            const active = pathname.startsWith(tab.href);
+            const active = pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href);
             const badge = badgeFor(tab.href);
             return (
               <Link

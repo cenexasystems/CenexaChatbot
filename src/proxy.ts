@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Local UI preview with sample data: no Supabase, no login. Never in production.
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true" && process.env.NODE_ENV !== "production") {
     return NextResponse.next({ request });
@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Public routes that don't require authentication
-  const publicPaths = ["/login", "/privacy", "/terms", "/home"];
+  const publicPaths = ["/login", "/privacy", "/terms"];
   const isPublicPath = publicPaths.some(
     (p) => request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + "/")
   );

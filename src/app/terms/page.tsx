@@ -14,9 +14,9 @@ export default function TermsPage() {
       style={{
         fontFamily:
           "'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        background: "linear-gradient(135deg, #EFF7FC 0%, #FFFFFF 50%, #EFF7FC 100%)",
         minHeight: "100vh",
-        color: "#e2e8f0",
+        color: "#17263B",
         padding: "0",
         margin: "0",
       }}
@@ -24,8 +24,8 @@ export default function TermsPage() {
       {/* Header */}
       <header
         style={{
-          background: "rgba(255,255,255,0.04)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(255,255,255,0.92)",
+          borderBottom: "1px solid #D7E4F0",
           padding: "20px 40px",
           display: "flex",
           alignItems: "center",
@@ -37,13 +37,13 @@ export default function TermsPage() {
           style={{
             width: "42px",
             height: "42px",
-            background: "linear-gradient(135deg, #25D366, #128C7E)",
+            background: "linear-gradient(135deg, #0B3B8C, #078BCB)",
             borderRadius: "12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            boxShadow: "0 4px 15px rgba(37,211,102,0.35)",
+            boxShadow: "0 4px 15px rgba(7,139,203,0.2)",
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
@@ -55,13 +55,13 @@ export default function TermsPage() {
             style={{
               fontSize: "18px",
               fontWeight: "700",
-              color: "#f1f5f9",
+              color: "#17263B",
               letterSpacing: "-0.3px",
             }}
           >
             Cenexa Systems
           </div>
-          <div style={{ fontSize: "13px", color: "#94a3b8" }}>Cenexa Chatflow</div>
+          <div style={{ fontSize: "13px", color: "#64748B" }}>Cenexa Chatflow</div>
         </div>
       </header>
 
@@ -83,7 +83,7 @@ export default function TermsPage() {
             padding: "6px 16px",
             fontSize: "12px",
             fontWeight: "600",
-            color: "#a5b4fc",
+            color: "#087DBB",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             marginBottom: "20px",
@@ -95,7 +95,7 @@ export default function TermsPage() {
           style={{
             fontSize: "clamp(32px, 5vw, 52px)",
             fontWeight: "800",
-            background: "linear-gradient(135deg, #f1f5f9 0%, #a5b4fc 100%)",
+            background: "linear-gradient(135deg, #17263B 0%, #087DBB 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -106,8 +106,8 @@ export default function TermsPage() {
         >
           Terms of Service
         </h1>
-        <p style={{ color: "#94a3b8", fontSize: "16px", margin: "0" }}>
-          Last Updated: <strong style={{ color: "#cbd5e1" }}>{lastUpdated}</strong>
+        <p style={{ color: "#64748B", fontSize: "16px", margin: "0" }}>
+          Last Updated: <strong style={{ color: "#475569" }}>{lastUpdated}</strong>
         </p>
       </div>
 
@@ -123,9 +123,9 @@ export default function TermsPage() {
         <Section>
           <p style={bodyText}>
             These Terms of Service (&quot;Terms&quot;) govern your access to and use of{" "}
-            <strong style={{ color: "#a5b4fc" }}>Cenexa Chatflow</strong>, a WhatsApp AI Agent
+            <strong style={{ color: "#087DBB" }}>Cenexa Chatflow</strong>, a WhatsApp AI Agent
             application developed and operated by{" "}
-            <strong style={{ color: "#f1f5f9" }}>Cenexa Systems</strong> (&quot;we&quot;,
+            <strong style={{ color: "#17263B" }}>Cenexa Systems</strong> (&quot;we&quot;,
             &quot;us&quot;, or &quot;our&quot;). By accessing or using Cenexa Chatflow, you agree to
             be bound by these Terms. If you do not agree, please do not use the Application.
           </p>
@@ -170,7 +170,7 @@ export default function TermsPage() {
         <SectionTitle>3. Acceptable Use</SectionTitle>
         <Section>
           <p style={bodyText}>
-            By using Cenexa Chatflow, you agree that you will <strong style={{ color: "#fbbf24" }}>not</strong>:
+            By using Cenexa Chatflow, you agree that you will <strong style={{ color: "#0B5BD3" }}>not</strong>:
           </p>
           <ul style={listStyle}>
             <li>Use the Application for any unlawful, fraudulent, or abusive purpose</li>
@@ -305,14 +305,14 @@ export default function TermsPage() {
         <SectionTitle>8. Disclaimers &amp; Limitation of Liability</SectionTitle>
         <Section>
           <p style={bodyText}>
-            <strong style={{ color: "#fbbf24" }}>Disclaimer of Warranties.</strong> The Application is
+            <strong style={{ color: "#0B5BD3" }}>Disclaimer of Warranties.</strong> The Application is
             provided &quot;as is&quot; and &quot;as available&quot; without warranties of any kind,
             either express or implied, including but not limited to warranties of merchantability,
             fitness for a particular purpose, or non-infringement. We do not warrant that the
             Application will be uninterrupted, error-free, or free of harmful components.
           </p>
           <p style={bodyText}>
-            <strong style={{ color: "#fbbf24" }}>AI-Generated Responses.</strong> Cenexa Chatflow
+            <strong style={{ color: "#0B5BD3" }}>AI-Generated Responses.</strong> Cenexa Chatflow
             uses artificial intelligence to generate automated responses. These responses are
             generated automatically and may not always be accurate, appropriate, or complete. You are
             responsible for reviewing and supervising AI-generated messages sent to your customers.
@@ -320,7 +320,7 @@ export default function TermsPage() {
             content.
           </p>
           <p style={bodyText}>
-            <strong style={{ color: "#fbbf24" }}>Limitation of Liability.</strong> To the maximum
+            <strong style={{ color: "#0B5BD3" }}>Limitation of Liability.</strong> To the maximum
             extent permitted by applicable law, Cenexa Systems shall not be liable for any indirect,
             incidental, special, consequential, or punitive damages, or any loss of profits, revenue,
             data, or goodwill arising out of or in connection with your use of the Application, even
@@ -395,22 +395,22 @@ export default function TermsPage() {
               marginTop: "12px",
             }}
           >
-            <p style={{ margin: "0 0 8px", color: "#f1f5f9", fontWeight: "700", fontSize: "16px" }}>
+            <p style={{ margin: "0 0 8px", color: "#17263B", fontWeight: "700", fontSize: "16px" }}>
               Cenexa Systems
             </p>
-            <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "14px" }}>
+            <p style={{ margin: "0 0 6px", color: "#64748B", fontSize: "14px" }}>
               📧{" "}
               <a href="mailto:support@cenexasystems.com" style={linkStyle}>
                 support@cenexasystems.com
               </a>
             </p>
-            <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "14px" }}>
+            <p style={{ margin: "0 0 6px", color: "#64748B", fontSize: "14px" }}>
               🌐{" "}
               <a href="https://cenexasystems.com" target="_blank" rel="noopener noreferrer" style={linkStyle}>
                 cenexasystems.com
               </a>
             </p>
-            <p style={{ margin: "0", color: "#94a3b8", fontSize: "14px" }}>
+            <p style={{ margin: "0", color: "#64748B", fontSize: "14px" }}>
               📋{" "}
               <a href="/privacy" style={linkStyle}>
                 View our Privacy Policy
@@ -423,7 +423,7 @@ export default function TermsPage() {
       {/* Footer */}
       <footer
         style={{
-          borderTop: "1px solid rgba(255,255,255,0.07)",
+          borderTop: "1px solid #D7E4F0",
           padding: "24px",
           textAlign: "center",
           color: "#475569",
@@ -451,7 +451,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: "19px",
         fontWeight: "700",
-        color: "#a5b4fc",
+        color: "#087DBB",
         margin: "40px 0 0",
         padding: "0 0 10px",
         borderBottom: "1px solid rgba(99,102,241,0.2)",
@@ -467,8 +467,8 @@ function Section({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "#F2F7FC",
+        border: "1px solid #D7E4F0",
         borderRadius: "14px",
         padding: "24px 28px",
         marginTop: "12px",
@@ -480,14 +480,14 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 const bodyText: React.CSSProperties = {
-  color: "#94a3b8",
+  color: "#64748B",
   lineHeight: "1.75",
   fontSize: "15px",
   margin: "0 0 14px",
 };
 
 const listStyle: React.CSSProperties = {
-  color: "#94a3b8",
+  color: "#64748B",
   lineHeight: "1.8",
   fontSize: "15px",
   paddingLeft: "22px",
@@ -495,7 +495,7 @@ const listStyle: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-  color: "#818cf8",
+  color: "#078BCB",
   textDecoration: "underline",
   textUnderlineOffset: "3px",
 };
