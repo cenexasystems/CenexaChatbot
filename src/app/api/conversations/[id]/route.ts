@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -35,18 +35,28 @@ export async function PATCH(
     return Response.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin } = access;
 
-  const { data, error } = await supabase
+  const { conversation, error: conversationError } = await getOwnedConversation(admin, businessId, id, "id");
+  if (conversationError) {
+    return Response.json({ error: "Unable to load conversation" }, { status: 500 });
+  }
+  if (!conversation) return conversationNotFound();
+
+  const { data, error } = await admin
     .from("conversations")
     .update(update)
     .eq("id", id)
+    .eq("business_id", businessId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
+  if (!data) return conversationNotFound();
 
   return Response.json(data);
 }

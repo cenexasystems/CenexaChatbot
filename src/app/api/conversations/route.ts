@@ -1,30 +1,17 @@
-import { NextRequest } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { requireBusinessAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const businessId = searchParams.get("business_id");
+export async function GET() {
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin } = access;
 
-  // Safety: never return all conversations without a business_id filter
-  if (!businessId) {
-    return Response.json([]);
-  }
-
-  const supabase = getSupabase();
-
-  let query = supabase
+  const { data: conversations, error } = await admin
     .from("conversations")
     .select("*")
+    .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
-
-  // Filter by business_id if provided
-  if (businessId) {
-    query = query.eq("business_id", businessId);
-  }
-
-  const { data: conversations, error } = await query;
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -34,14 +21,14 @@ export async function GET(request: NextRequest) {
   const withLastMessage = await Promise.all(
     (conversations || []).map(async (convo) => {
       const [{ data: messages }, { data: inbound }] = await Promise.all([
-        supabase
+        admin
           .from("messages")
           .select("*")
           .eq("conversation_id", convo.id)
           .order("created_at", { ascending: false })
           .limit(1),
         // Latest customer message: drives the 24-hour reply-window timer.
-        supabase
+        admin
           .from("messages")
           .select("created_at")
           .eq("conversation_id", convo.id)

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { SYSTEM_PROMPT } from "@/lib/system-prompt";
+import { SYSTEM_PROMPT } from "./system-prompt.ts";
 
 const FALLBACK_REPLIES = [
   "Sorry, I'm having a small technical issue right now! Please try again in a moment. 🙏",
