@@ -1,12 +1,16 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { sendWhatsAppMessage, extractWamid } from "@/lib/whatsapp";
+import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin } = access;
   const body = await request.json();
   const { message } = body;
 
@@ -14,28 +18,21 @@ export async function POST(
     return Response.json({ error: "Message is required" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
   // Get conversation + business credentials
-  const { data: conversation, error: convoError } = await supabase
-    .from("conversations")
-    .select("phone, business_id")
-    .eq("id", id)
-    .single();
-
-  if (convoError || !conversation) {
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
-  }
+  const { conversation, error: convoError } = await getOwnedConversation(admin, businessId, id, "phone, business_id");
+  if (convoError) return Response.json({ error: "Unable to load conversation" }, { status: 500 });
+  if (!conversation) return conversationNotFound();
+  const typedConversation = conversation as { phone: string; business_id: string };
 
   // Fetch business credentials if linked
   let phoneNumberId: string | undefined;
   let accessToken: string | undefined;
 
-  if (conversation.business_id) {
-    const { data: biz } = await supabase
+  if (typedConversation.business_id) {
+    const { data: biz } = await admin
       .from("businesses")
       .select("phone_number_id, access_token")
-      .eq("id", conversation.business_id)
+      .eq("id", businessId)
       .single();
 
     if (biz) {
@@ -45,15 +42,17 @@ export async function POST(
   }
 
   // Send via WhatsApp using business credentials
-  await sendWhatsAppMessage(conversation.phone, message, { phoneNumberId, accessToken });
+  const waResult = await sendWhatsAppMessage(typedConversation.phone, message, { phoneNumberId, accessToken });
 
   // Store in DB
-  const { data: msg, error: msgError } = await supabase
+  const { data: msg, error: msgError } = await admin
     .from("messages")
     .insert({
       conversation_id: id,
       role: "assistant",
+      source: "dashboard",
       content: message,
+      whatsapp_msg_id: extractWamid(waResult),
     })
     .select()
     .single();
@@ -63,10 +62,12 @@ export async function POST(
   }
 
   // Update conversation timestamp
-  await supabase
+  await admin
     .from("conversations")
     .update({ updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("business_id", businessId);
+  if (!waResult?.error) await resolveOwnerAlertsForConversation(businessId, id, ["handoff"]);
 
   return Response.json(msg);
 }

@@ -145,6 +145,10 @@ export default function Dashboard() {
       })
       .then((data) => {
         if (data && data.business) {
+          if (data.business.dashboard_v2_enabled === true) {
+            router.replace("/today");
+            return;
+          }
           setBusiness(data.business);
         }
         setAuthLoading(false);

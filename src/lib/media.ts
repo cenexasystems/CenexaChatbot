@@ -1,8 +1,9 @@
 import { getSupabase } from "@/lib/supabase";
+import { GRAPH_BASE } from "@/lib/graph";
 
 export async function getMediaUrl(mediaId: string, accessToken: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, {
+    const res = await fetch(`${GRAPH_BASE}/${mediaId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) return null;
@@ -18,7 +19,8 @@ export async function downloadMedia(
   try {
     const res = await fetch(mediaUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (!res.ok) return null;
-    const mimeType = res.headers.get("content-type") ?? "application/octet-stream";
+    // Voice notes arrive as "audio/ogg; codecs=opus" — strip parameters so lookups work.
+    const mimeType = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim().toLowerCase();
     return { buffer: Buffer.from(await res.arrayBuffer()), mimeType };
   } catch { return null; }
 }
@@ -30,6 +32,10 @@ function getExtension(mimeType: string): string {
     "image/webp": "webp",
     "image/gif": "gif",
     "audio/ogg": "ogg",
+    "audio/opus": "ogg",
+    "audio/amr": "amr",
+    "audio/wav": "wav",
+    "audio/webm": "webm",
     "audio/mpeg": "mp3",
     "audio/mp4": "m4a",
     "audio/aac": "aac",
@@ -55,6 +61,9 @@ export async function processAndStoreMedia(
 ): Promise<{
   publicUrl: string;
   mediaType: "image" | "audio" | "document" | "video" | "sticker";
+  /** Raw bytes + MIME so callers can run transcription / vision without re-downloading. */
+  buffer: Buffer;
+  mimeType: string;
 } | null> {
   const mediaUrl = await getMediaUrl(mediaId, accessToken);
   if (!mediaUrl) return null;
@@ -78,5 +87,5 @@ export async function processAndStoreMedia(
   }
 
   const { data } = supabase.storage.from("whatsapp-media").getPublicUrl(fileName);
-  return { publicUrl: data.publicUrl, mediaType };
+  return { publicUrl: data.publicUrl, mediaType, buffer, mimeType };
 }

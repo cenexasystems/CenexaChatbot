@@ -1,39 +1,30 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { sendWhatsAppImage } from "@/lib/whatsapp";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { extractWamid, sendWhatsAppImage } from "@/lib/whatsapp";
+import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const adminSupabase = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy"
-  );
-  
   const { id } = await params;
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin } = access;
   const body = await request.json();
   const { imageUrl } = body; // optional — if provided, save as business QR for future use
 
-  const supabase = await createClient();
-
   // Get conversation details
-  const { data: conversation, error: convoError } = await supabase
-    .from("conversations")
-    .select("phone, business_id")
-    .eq("id", id)
-    .single();
-
-  if (convoError || !conversation) {
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
-  }
+  const { conversation, error: convoError } = await getOwnedConversation(admin, businessId, id, "phone, business_id");
+  if (convoError) return Response.json({ error: "Unable to load conversation" }, { status: 500 });
+  if (!conversation) return conversationNotFound();
+  const typedConversation = conversation as { phone: string; business_id: string };
 
   // Get business credentials + stored QR URL
-  const { data: biz } = await adminSupabase
+  const { data: biz } = await admin
     .from("businesses")
     .select("phone_number_id, access_token, qr_image_url")
-    .eq("id", conversation.business_id)
+    .eq("id", businessId)
     .single();
 
   if (!biz) {
@@ -52,15 +43,15 @@ export async function POST(
 
   // If a new image URL was provided, save it as the business QR for future use
   if (imageUrl && imageUrl !== biz.qr_image_url) {
-    await adminSupabase
+    await admin
       .from("businesses")
       .update({ qr_image_url: imageUrl })
-      .eq("id", conversation.business_id);
+      .eq("id", businessId);
   }
 
   // Send QR image to customer via WhatsApp
   const waResult = await sendWhatsAppImage(
-    conversation.phone,
+    typedConversation.phone,
     qrUrl,
     "Please scan this QR code to complete your payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
     { phoneNumberId: biz.phone_number_id, accessToken: biz.access_token }
@@ -71,22 +62,26 @@ export async function POST(
   }
 
   // Set payment_qr_sent = true so next image from customer is treated as payment
-  await adminSupabase
+  await admin
     .from("conversations")
     .update({
       payment_qr_sent: true,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("business_id", businessId);
 
   // Log the QR send as a message
-  await adminSupabase.from("messages").insert({
+  await admin.from("messages").insert({
     conversation_id: id,
     role: "assistant",
+    source: "dashboard",
     content: "Please scan this QR code to complete your payment 💳\n\nOnce paid, please reply with a screenshot of your payment so we can confirm it! 💛",
+    whatsapp_msg_id: extractWamid(waResult),
     media_url: qrUrl,
     media_type: "image",
   });
+  await resolveOwnerAlertsForConversation(businessId, id, ["handoff"]);
 
   return Response.json({ success: true, qrUrl });
 }
