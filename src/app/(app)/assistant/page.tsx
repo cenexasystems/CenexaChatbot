@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useDashboard } from "@/components/cx/DashboardProvider";
-import { Page, Roadmap } from "@/components/cx/Page";
+import { Page } from "@/components/cx/Page";
 import { Field, Panel, Status } from "@/components/cx/ui";
 import { aiPausedUntil, isAiHandling } from "@/lib/inbox";
+import { AssistantStudio } from "@/components/cx/AssistantStudio";
 
 export default function AssistantPage() {
   const { conversations, now, business } = useDashboard();
@@ -31,21 +32,12 @@ export default function AssistantPage() {
             <Field label="Phone app link (coexistence)">
               {business?.coexistence_enabled === undefined ? "—" : business.coexistence_enabled ? <Status tone="success">Enabled</Status> : <Status>Off</Status>}
             </Field>
-            <Field label="Instructions">Managed by Cenexa</Field>
+            <Field label="Instructions">Configured in this studio</Field>
           </dl>
         </Panel>
       </div>
 
-      <Panel className="mt-5" title="Roadmap" icon="flow">
-        <Roadmap
-          items={[
-            { icon: "note", title: "Instruction editor", body: "Edit tone, products, prices and timings yourself." },
-            { icon: "file", title: "Knowledge files", body: "Upload a price list or brochure. Answers cite their source." },
-            { icon: "assistant", title: "Test console", body: "Try questions in Tamil, English or both before customers do." },
-            { icon: "user", title: "Hand-off rules", body: "Choose when the AI stops and alerts you." },
-          ]}
-        />
-      </Panel>
+      <AssistantStudio />
     </Page>
   );
 }

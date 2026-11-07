@@ -158,6 +158,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         refresh();
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
+        const msg = payload.new as Message;
+        if (!convoIds.current.has(msg.conversation_id)) return;
+        setMessages((all) => {
+          const list = all[msg.conversation_id];
+          if (!list) return all;
+          return {
+            ...all,
+            [msg.conversation_id]: list.map((existing) =>
+              existing.id === msg.id ? { ...existing, ...msg } : existing
+            ),
+          };
+        });
+      })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations", filter: `business_id=eq.${businessId}` },

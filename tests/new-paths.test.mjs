@@ -2,6 +2,9 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { describeMediaForAI } from "../src/lib/media-ai.ts";
+import { appendHandoffRules, isConfiguredGreeting, rewriteConfiguredUrls } from "../src/lib/assistant-config.ts";
+import { parseDeliveryStatusEvent } from "../src/lib/delivery-status.ts";
+import { isPersonHandoffRequest } from "../src/lib/handoff.ts";
 import { createMockState } from "./mock-db.ts";
 
 function verifySignature(raw, header, secret, mode = "off") {
@@ -24,6 +27,44 @@ const HANDOFF_REPLY =
   "Thank you for letting us know 🙏 I'm passing this to our team so they can look at it personally and get back to you shortly 💛";
 
 describe("NEW PATHS: Feature Flags & Security", () => {
+  describe("Owner alert triggers", () => {
+    test("recognizes direct requests to talk to a person in English and Tamil", () => {
+      assert.equal(isPersonHandoffRequest("Can I speak to a person, please?"), true);
+      assert.equal(isPersonHandoffRequest("Please connect me to a human"), true);
+      assert.equal(isPersonHandoffRequest("ஒருவரிடம் பேச வேண்டும்"), true);
+      assert.equal(isPersonHandoffRequest("What are your opening hours?"), false);
+    });
+  });
+
+  describe("WhatsApp delivery receipts", () => {
+    test("accepts sent, delivered, read, and failed events with a message id", () => {
+      const statuses = ["sent", "delivered", "read", "failed"];
+      for (const status of statuses) {
+        const parsed = parseDeliveryStatusEvent({ id: "wamid.outbound", status });
+        assert.equal(parsed?.messageId, "wamid.outbound");
+        assert.equal(parsed?.status, status);
+      }
+    });
+
+    test("stores Meta's failure code and prevents late events from downgrading progress", () => {
+      const failed = parseDeliveryStatusEvent({
+        id: "wamid.failed",
+        status: "failed",
+        errors: [{ code: 131047 }],
+      });
+      assert.equal(failed?.errorCode, "131047");
+      assert.deepEqual(failed?.eligiblePreviousStatuses, ["sent", "failed"]);
+
+      const read = parseDeliveryStatusEvent({ id: "wamid.read", status: "read" });
+      assert.deepEqual(read?.eligiblePreviousStatuses, ["sent", "failed", "delivered", "read"]);
+    });
+
+    test("ignores malformed and unknown status events", () => {
+      assert.equal(parseDeliveryStatusEvent({ status: "read" }), null);
+      assert.equal(parseDeliveryStatusEvent({ id: "wamid.unknown", status: "queued" }), null);
+    });
+  });
+
   describe("Signature Verification (3 modes: off, log, enforce)", () => {
     const rawBody = JSON.stringify({ object: "whatsapp_business_account" });
     const secret = "test_meta_app_secret";
@@ -175,5 +216,21 @@ describe("NEW PATHS: Feature Flags & Security", () => {
       assert.equal(biz.is_active, false);
       assert.equal(biz.disconnected_reason, "PARTNER_REMOVED");
     });
+  });
+});
+
+describe("Assistant Studio configuration", () => {
+  test("matches configured greetings after trimming punctuation and whitespace", () => {
+    assert.equal(isConfiguredGreeting("  வணக்கம்!  ", ["வணக்கம்"]), true);
+    assert.equal(isConfiguredGreeting("hello", ["வணக்கம்"]), false);
+  });
+
+  test("rewrites only the configured business URL", () => {
+    assert.equal(rewriteConfiguredUrls("Visit https://old.example and https://other.example", "https://old.example", "https://new.example"), "Visit https://new.example and https://other.example");
+  });
+
+  test("appends hand-off rules without replacing the base instructions", () => {
+    assert.equal(appendHandoffRules("Be kind.", "Escalate billing disputes."), "Be kind.\n\nHAND-OFF RULES\nEscalate billing disputes.");
+    assert.equal(appendHandoffRules(null, "Call the owner for refunds."), "HAND-OFF RULES\nCall the owner for refunds.");
   });
 });

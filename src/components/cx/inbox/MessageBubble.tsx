@@ -44,6 +44,24 @@ export function MessageBubble({
         <div className={cx("flex items-center gap-2 mb-1 px-0.5", inbound ? "flex-row" : "flex-row-reverse")}>
           <SenderLabel sender={sender} />
           <span className="text-[10.5px] text-ink-faint tabular">{pending ? "Sending…" : formatClock(msg.created_at)}</span>
+          {!pending && !inbound && msg.delivery_status && (
+            <span
+              className={cx(
+                "inline-flex items-center gap-1 text-[10px]",
+                msg.delivery_status === "failed" ? "text-danger" : msg.delivery_status === "read" ? "text-accent" : "text-ink-faint"
+              )}
+              title={msg.delivery_status === "failed" && msg.delivery_error_code
+                ? `Failed (Meta error ${msg.delivery_error_code})`
+                : msg.delivery_status[0].toUpperCase() + msg.delivery_status.slice(1)}
+              aria-label={msg.delivery_status === "failed" ? "Message failed to send" : `Message ${msg.delivery_status}`}
+            >
+              {msg.delivery_status === "failed" ? (
+                <><Icon name="alert" size={12} /><span>Failed</span></>
+              ) : (
+                <Icon name={msg.delivery_status === "sent" ? "check" : "checks"} size={13} />
+              )}
+            </span>
+          )}
           {!pending && (
             <button
               onClick={onDelete}

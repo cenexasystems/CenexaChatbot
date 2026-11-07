@@ -8,6 +8,11 @@ export interface Business {
   ai_model: string;
   system_prompt: string | null;
   welcome_message: string | null;
+  handoff_rules?: string | null;
+  handoff_keywords?: string[];
+  greeting_phrases?: string[];
+  url_rewrite_from?: string | null;
+  url_rewrite_to?: string | null;
   plan: "basic" | "pro" | "enterprise";
   is_active: boolean;
   qr_image_url: string | null;
@@ -19,6 +24,7 @@ export interface Business {
   vision_model?: string | null;
   coexistence_enabled?: boolean;
   media_ai_enabled?: boolean;
+  dashboard_v2_enabled?: boolean;
   created_at: string;
 }
 
@@ -62,6 +68,8 @@ export interface Message {
   media_type: "image" | "audio" | "document" | "video" | "sticker" | null;
   is_payment_screenshot: boolean;
   whatsapp_msg_id: string | null;
+  delivery_status?: "sent" | "delivered" | "read" | "failed" | null;
+  delivery_error_code?: string | null;
   source?: "customer" | "ai" | "dashboard" | "business_app" | "history" | null;
   transcript?: string | null;
   media_analysis?: Record<string, unknown> | null;

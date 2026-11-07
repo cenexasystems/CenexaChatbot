@@ -6,6 +6,8 @@ import { Panel, cx } from "@/components/cx/ui";
 import { Icon, type IconName } from "@/components/cx/icons";
 import { logout } from "@/app/login/actions";
 import { isMoneyToConfirm } from "@/lib/inbox";
+import { OwnerAlertSettings } from "@/components/cx/OwnerAlertSettings";
+import { WhatsAppConnection } from "@/components/cx/WhatsAppConnection";
 
 type Item = { icon: IconName; label: string; hint: string; href?: string; count?: number };
 
@@ -27,7 +29,7 @@ export default function MorePage() {
     {
       title: "Account",
       items: [
-        { icon: "wifi", label: "WhatsApp connection", hint: "Phone app link, quality rating, limits" },
+        { icon: "wifi", label: "WhatsApp connection", hint: "Phone app link, sync and connection status", href: "#whatsapp-connection" },
         { icon: "wallet", label: "Wallet and invoices", hint: "Message costs and GST invoices" },
         { icon: "plug", label: "Integrations", hint: "Website, Shopify, sheets" },
       ],
@@ -68,6 +70,10 @@ export default function MorePage() {
             <p className="text-[12px] text-ink-faint mt-2">Hindi next. Some screens are English only for now.</p>
           </div>
         </Panel>
+
+        <OwnerAlertSettings demo={demo} />
+
+        <WhatsAppConnection demo={demo} />
 
         <Panel title="Session" icon="user">
           <ul className="divide-y divide-line">
