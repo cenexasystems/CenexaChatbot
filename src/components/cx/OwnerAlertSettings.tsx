@@ -29,6 +29,24 @@ function applicationServerKey(value: string): Uint8Array {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 }
 
+function isAppleMobile() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isAppleMobileSafe() {
+  return typeof navigator !== "undefined" && isAppleMobile();
+}
+
+function isInstalledPwa() {
+  return window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+}
+
+function isInstalledPwaSafe() {
+  return typeof window !== "undefined" && typeof navigator !== "undefined" && isInstalledPwa();
+}
+
 export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
   const [settings, setSettings] = useState<Settings>(EMPTY);
   const [pushKey, setPushKey] = useState<string | null>(null);
@@ -47,7 +65,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
       fetch("/api/owner-alerts/settings").then((res) => res.json()),
       fetch("/api/push/subscriptions").then((res) => res.json()),
     ])
-      .then(([alertData, pushData]) => {
+      .then(async ([alertData, pushData]) => {
         if (!live) return;
         if (alertData.settings) {
           setSettings({
@@ -59,7 +77,18 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
         }
         setWhatsappTemplateConfigured(alertData.whatsappTemplateConfigured === true);
         setPushKey(pushData.publicKey ?? null);
-        setPushSubscribed(pushData.subscribed === true);
+        // Push subscriptions belong to one browser/device. Do not treat a subscription
+        // saved on a laptop as if this phone were already subscribed.
+        if ("serviceWorker" in navigator && "PushManager" in window) {
+          try {
+            const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+            setPushSubscribed(Boolean(await registration.pushManager.getSubscription()));
+          } catch {
+            setPushSubscribed(false);
+          }
+        } else {
+          setPushSubscribed(false);
+        }
       })
       .catch(() => live && setError("Could not load alert settings."))
       .finally(() => live && setLoading(false));
@@ -108,11 +137,15 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
     try {
       if (!pushKey) throw new Error("Web Push is not configured on this server.");
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        throw new Error("This browser does not support push notifications.");
+        throw new Error("This browser does not support push notifications. Update your browser or use Chrome on Android, or install Cenexa on iPhone/iPad with iOS 16.4 or later.");
+      }
+      if (isAppleMobile() && !isInstalledPwa()) {
+        throw new Error("On iPhone or iPad, first use Safari Share → Add to Home Screen. Open Cenexa from that icon, then enable notifications.");
       }
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error("Allow notifications in your browser to receive owner alerts.");
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKey(pushKey) as BufferSource,
@@ -170,7 +203,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[13px] font-semibold">Browser notifications</p>
-                <p className="text-[12px] text-ink-faint">Handoffs and payment screenshots on this device.</p>
+                <p className="text-[12px] text-ink-faint">Handoffs and payment screenshots on this phone or browser.</p>
               </div>
               {pushSubscribed ? (
                 <Button size="sm" onClick={disablePush} disabled={workingPush}>Turn off</Button>
@@ -180,6 +213,9 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
                 </Button>
               )}
             </div>
+            {isAppleMobileSafe() && !isInstalledPwaSafe() && (
+              <p className="text-[11px] text-ink-faint">On iPhone/iPad, add Cenexa to your Home Screen from Safari, open it there, then enable alerts here.</p>
+            )}
             {!pushKey && <p className="text-[11px] text-attention">Web Push keys need to be configured by the app administrator.</p>}
           </section>
 

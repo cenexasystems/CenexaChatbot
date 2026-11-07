@@ -8,6 +8,7 @@ import { logout } from "@/app/login/actions";
 import { isMoneyToConfirm } from "@/lib/inbox";
 import { OwnerAlertSettings } from "@/components/cx/OwnerAlertSettings";
 import { WhatsAppConnection } from "@/components/cx/WhatsAppConnection";
+import { PwaInstallCard } from "@/components/cx/PwaInstallCard";
 
 type Item = { icon: IconName; label: string; hint: string; href?: string; count?: number };
 
@@ -72,6 +73,8 @@ export default function MorePage() {
         </Panel>
 
         <OwnerAlertSettings demo={demo} />
+
+        <PwaInstallCard />
 
         <WhatsAppConnection demo={demo} />
 
