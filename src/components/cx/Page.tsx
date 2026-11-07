@@ -1,5 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
 import { cx } from "./ui";
 
@@ -19,8 +20,9 @@ export function Page({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const pathname = usePathname();
   return (
-    <div className="h-full flex flex-col">
+    <div key={pathname} className="h-full flex flex-col">
       <header className="shrink-0 bg-surface border-b border-line">
         <div className={cx("mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3 min-h-[76px]", wide ? "max-w-6xl" : "max-w-5xl")}>
           {/* Title block with a brand bar on the left, as in the NAAYAN panels. */}

@@ -80,7 +80,7 @@ export default function MorePage() {
             <li>
               <Link href="/" className="flex items-center gap-3 px-4 h-12 hover:bg-canvas text-[13px] font-medium">
                 <Icon name="history" size={17} className="text-ink-faint" />
-                <span className="flex-1">Open classic dashboard</span>
+                <span className="flex-1">Open home dashboard</span>
                 <Icon name="chevron" size={16} className="text-ink-faint" />
               </Link>
             </li>

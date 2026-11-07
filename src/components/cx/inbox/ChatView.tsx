@@ -12,7 +12,7 @@ import { aiPausedUntil, formatDayLabel, formatDuration, formatPhone, windowLeftM
 type Toast = { msg: string; tone: "ok" | "error" } | null;
 
 export function ChatView({ id }: { id: string }) {
-  const { conversations, messages, loadMessages, now, patch, resumeAI, sendText, sendImage, verifyPayment, deleteMessage, business } = useDashboard();
+  const { conversations, messages, loadMessages, now, changeMode, sendText, sendImage, verifyPayment, deleteMessage, business } = useDashboard();
   const params = useSearchParams();
   const backHref = params.get("filter") ? `/inbox?filter=${params.get("filter")}` : "/inbox";
   const c = conversations.find((x) => x.id === id);
@@ -23,6 +23,7 @@ export function ChatView({ id }: { id: string }) {
   const [image, setImage] = useState<{ file: File; preview: string } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
+  const [modeBusy, setModeBusy] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -113,8 +114,11 @@ export function ChatView({ id }: { id: string }) {
   }
 
   async function setMode(mode: "agent" | "human") {
-    const ok = mode === "agent" ? (await resumeAI(id), true) : await patch(id, { mode });
-    if (ok === false) showToast("Could not switch. Try again.", "error");
+    if (modeBusy) return;
+    setModeBusy(true);
+    const ok = await changeMode(id, mode);
+    setModeBusy(false);
+    if (!ok) showToast("Could not save this reply mode. Please try again.", "error");
   }
 
   // Keyed by chat so the note draft resets when you open another chat.
@@ -135,7 +139,7 @@ export function ChatView({ id }: { id: string }) {
               <p className="text-[11.5px] text-ink-faint font-mono truncate mt-0.5">{formatPhone(c.phone)}</p>
             </div>
           </button>
-          <ModeSwitch mode={paused ? "human" : c.mode} onChange={setMode} />
+          <ModeSwitch mode={paused ? "human" : c.mode} onChange={setMode} disabled={modeBusy} />
           <IconButton icon="panel" label="Customer details" onClick={() => setDetailsOpen(true)} className="xl:hidden" />
         </header>
 
@@ -143,7 +147,7 @@ export function ChatView({ id }: { id: string }) {
         {paused ? (
           <Bar label="AI paused" icon="phone">
             <span className="flex-1 min-w-0">You replied from the phone app. AI resumes in <strong className="tabular">{formatDuration(paused.getTime() - now)}</strong>.</span>
-            <Button size="sm" variant="secondary" icon="play" onClick={() => resumeAI(id)}>Resume</Button>
+            <Button size="sm" variant="secondary" icon="play" onClick={() => setMode("agent")} disabled={modeBusy}>Resume</Button>
           </Bar>
         ) : c.mode === "human" ? (
           <Bar label="Manual" icon="user">
@@ -276,17 +280,18 @@ export function ChatView({ id }: { id: string }) {
   );
 }
 
-function ModeSwitch({ mode, onChange }: { mode: "agent" | "human"; onChange: (m: "agent" | "human") => void }) {
+function ModeSwitch({ mode, onChange, disabled }: { mode: "agent" | "human"; onChange: (m: "agent" | "human") => void; disabled: boolean }) {
   return (
-    <div className="flex shrink-0 border border-line-strong rounded-[10px] p-0.5 bg-surface" role="radiogroup" aria-label="Who replies">
+    <div className="flex shrink-0 border border-line-strong rounded-[10px] p-0.5 bg-surface" role="radiogroup" aria-label="Who replies" aria-busy={disabled}>
       {(["agent", "human"] as const).map((m) => (
         <button
           key={m}
           role="radio"
           aria-checked={mode === m}
-          onClick={() => mode !== m && onChange(m)}
+          onClick={() => mode !== m && !disabled && onChange(m)}
+          disabled={disabled}
           className={cx(
-            "h-8 px-2.5 sm:px-3 rounded-[8px] text-[11px] font-bold uppercase tracking-[0.08em] flex items-center gap-1.5 transition-colors",
+            "h-9 px-2.5 sm:px-3 rounded-[8px] text-[12px] font-extrabold uppercase tracking-[0.07em] flex items-center gap-1.5 transition-colors disabled:opacity-60",
             mode === m ? "bg-brand text-white shadow-brand" : "text-ink-faint hover:text-ink"
           )}
         >
