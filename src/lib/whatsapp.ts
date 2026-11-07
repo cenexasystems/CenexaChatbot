@@ -33,6 +33,30 @@ export async function sendWhatsAppImage(
   return postMessage({ to, type: "image", image: { link: url, caption } }, options);
 }
 
+export async function sendWhatsAppTemplate(
+  to: string,
+  name: string,
+  languageCode: string,
+  bodyParameters: string[],
+  options: SendOptions = {}
+) {
+  return postMessage(
+    {
+      to,
+      type: "template",
+      template: {
+        name,
+        language: { code: languageCode },
+        components: [{
+          type: "body",
+          parameters: bodyParameters.map((text) => ({ type: "text", text })),
+        }],
+      },
+    },
+    options
+  );
+}
+
 /** Pull the wamid out of a Cloud API send response (used to de-dupe against smb_message_echoes). */
 export function extractWamid(result: unknown): string | null {
   const res = result as { messages?: Array<{ id?: string }> } | null | undefined;

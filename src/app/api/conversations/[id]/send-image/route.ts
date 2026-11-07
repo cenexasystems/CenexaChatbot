@@ -1,18 +1,16 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
 import { sendWhatsAppImage, extractWamid } from "@/lib/whatsapp";
+import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const adminSupabase = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy"
-  );
-
   const { id } = await params;
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin } = access;
   const body = await request.json();
   const { imageUrl, caption = "" } = body;
 
@@ -20,24 +18,17 @@ export async function POST(
     return Response.json({ error: "imageUrl is required" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
   // Get conversation details
-  const { data: conversation, error: convoError } = await supabase
-    .from("conversations")
-    .select("phone, business_id")
-    .eq("id", id)
-    .single();
-
-  if (convoError || !conversation) {
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
-  }
+  const { conversation, error: convoError } = await getOwnedConversation(admin, businessId, id, "phone, business_id");
+  if (convoError) return Response.json({ error: "Unable to load conversation" }, { status: 500 });
+  if (!conversation) return conversationNotFound();
+  const typedConversation = conversation as { phone: string; business_id: string };
 
   // Get business credentials
-  const { data: biz } = await adminSupabase
+  const { data: biz } = await admin
     .from("businesses")
     .select("phone_number_id, access_token")
-    .eq("id", conversation.business_id)
+    .eq("id", businessId)
     .single();
 
   if (!biz) {
@@ -46,7 +37,7 @@ export async function POST(
 
   // Send image to customer via WhatsApp
   const waResult = await sendWhatsAppImage(
-    conversation.phone,
+    typedConversation.phone,
     imageUrl,
     caption,
     { phoneNumberId: biz.phone_number_id, accessToken: biz.access_token }
@@ -57,7 +48,7 @@ export async function POST(
   }
 
   // Log the message in DB so it shows in the dashboard
-  await adminSupabase.from("messages").insert({
+  await admin.from("messages").insert({
     conversation_id: id,
     role: "assistant",
     source: "dashboard",
@@ -68,10 +59,12 @@ export async function POST(
   });
 
   // Update conversation timestamp
-  await adminSupabase
+  await admin
     .from("conversations")
     .update({ updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("business_id", businessId);
+  await resolveOwnerAlertsForConversation(businessId, id, ["handoff"]);
 
   return Response.json({ success: true });
 }

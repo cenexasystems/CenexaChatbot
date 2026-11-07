@@ -7,6 +7,10 @@ import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia } from "@/lib/media";
 import { analyzeImage, analyzeVoiceNote, describeMediaForAI } from "@/lib/media-ai";
 import { getSupabase } from "@/lib/supabase";
+import { parseDeliveryStatusEvent } from "@/lib/delivery-status";
+import { enqueueOwnerAlert, resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
+import { isPersonHandoffRequest } from "@/lib/handoff";
+import { appendHandoffRules, isConfiguredGreeting, rewriteConfiguredUrls } from "@/lib/assistant-config";
 
 // Voice/vision + AI reply can take several seconds. We ack Meta immediately and
 // keep working via after(); this raises the ceiling for that background work.
@@ -110,7 +114,8 @@ async function processPayload(body: any) {
             await handleAccountUpdate(entry.id, value);
             break;
           default:
-            // "messages" (and legacy payloads without a field name)
+            // Status receipts and inbound messages are both sent on the "messages" field.
+            for (const status of value.statuses ?? []) await handleDeliveryStatus(value, status);
             for (const m of value.messages ?? []) await handleIncoming(value, m);
         }
       } catch (err) {
@@ -120,17 +125,67 @@ async function processPayload(body: any) {
   }
 }
 
-/* ───────────────────────── shared helpers ───────────────────────── */
+async function handleDeliveryStatus(value: any, event: any) {
+  const update = parseDeliveryStatusEvent(event);
+  const phoneNumberId: string | undefined = value.metadata?.phone_number_id;
+  if (!update || !phoneNumberId) return;
 
-const fixUrl = (s: string | null) =>
-  s ? s.replace(/https:\/\/b2-bridal-studio-upgraded\.vercel\.app/g, "https://b2bridalstudio.com") : null;
+  const supabase = getSupabase();
+  // Resolve the sender tenant even when its account has since been disconnected.
+  const { data: business, error: businessError } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("phone_number_id", phoneNumberId)
+    .maybeSingle();
+  if (businessError) {
+    console.error("[webhook] delivery status business lookup failed:", businessError.message);
+    return;
+  }
+  if (!business) return;
+
+  const { data: message, error: messageError } = await supabase
+    .from("messages")
+    .select("id, conversation_id")
+    .eq("whatsapp_msg_id", update.messageId)
+    .eq("role", "assistant")
+    .maybeSingle();
+  if (messageError) {
+    console.error("[webhook] delivery status message lookup failed:", messageError.message);
+    return;
+  }
+  if (!message) return;
+
+  // WAMIDs are unique, but also verify the conversation belongs to the webhook tenant.
+  const { data: conversation, error: conversationError } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", message.conversation_id)
+    .eq("business_id", business.id)
+    .maybeSingle();
+  if (conversationError) {
+    console.error("[webhook] delivery status conversation lookup failed:", conversationError.message);
+    return;
+  }
+  if (!conversation) return;
+
+  let query = supabase
+    .from("messages")
+    .update({ delivery_status: update.status, delivery_error_code: update.errorCode })
+    .eq("id", message.id);
+  const allowed = update.eligiblePreviousStatuses.map((status) => `delivery_status.eq.${status}`);
+  query = query.or(["delivery_status.is.null", ...allowed].join(","));
+  const { error } = await query;
+  if (error) console.error("[webhook] delivery status update failed:", error.message);
+}
+
+/* ───────────────────────── shared helpers ───────────────────────── */
 
 async function getBusiness(phoneNumberId?: string) {
   if (!phoneNumberId) return null;
   const { data } = await getSupabase()
     .from("businesses")
     .select(
-      "id, access_token, openrouter_api_key, ai_model, system_prompt, welcome_message, handoff_minutes, vision_model, media_ai_enabled, coexistence_enabled"
+      "id, access_token, openrouter_api_key, ai_model, system_prompt, welcome_message, handoff_minutes, vision_model, media_ai_enabled, coexistence_enabled, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to"
     )
     .eq("phone_number_id", phoneNumberId)
     .eq("is_active", true)
@@ -217,8 +272,11 @@ async function handleIncoming(value: any, message: any) {
   const businessId: string | null = biz?.id ?? null;
   const accessToken: string | undefined = biz?.access_token ?? undefined;
   const sendOpts = { phoneNumberId: incomingPhoneNumberId, accessToken };
-  const systemPrompt = fixUrl(biz?.system_prompt ?? null);
-  const welcomeMessage = fixUrl(biz?.welcome_message ?? null);
+  const systemPrompt = appendHandoffRules(
+    rewriteConfiguredUrls(biz?.system_prompt, biz?.url_rewrite_from, biz?.url_rewrite_to),
+    biz?.handoff_rules
+  );
+  const welcomeMessage = rewriteConfiguredUrls(biz?.welcome_message, biz?.url_rewrite_from, biz?.url_rewrite_to);
   const handoffMinutes: number = biz?.handoff_minutes ?? 60;
   const isMediaAiEnabled = biz?.media_ai_enabled === true;
   const isCoexistenceEnabled = biz?.coexistence_enabled === true;
@@ -278,16 +336,6 @@ async function handleIncoming(value: any, message: any) {
 
   await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation.id);
 
-  /* ── should the AI answer at all? ──
-     "human" = manual dashboard toggle.
-     ai_paused_until = owner replied from WhatsApp Business app (ONLY checked when coexistence_enabled = true). */
-  if (conversation.mode === "human") return;
-
-  if (isCoexistenceEnabled) {
-    const paused = conversation.ai_paused_until && new Date(conversation.ai_paused_until) > new Date();
-    if (paused) return;
-  }
-
   const reply = async (content: string) => {
     const result = await sendWhatsAppMessage(phone, content, sendOpts);
     if (!result?.error) {
@@ -301,6 +349,35 @@ async function handleIncoming(value: any, message: any) {
     }
     return result;
   };
+
+  if (isPaymentScreenshot && businessId) {
+    await enqueueOwnerAlert(businessId, conversation.id, "payment", message.id);
+  }
+
+  if (msgType === "text" && isPersonHandoffRequest(text, biz?.handoff_keywords ?? [])) {
+    if (conversation.mode !== "human") {
+      await supabase
+        .from("conversations")
+        .update({
+          mode: "human",
+          ...(isCoexistenceEnabled ? { ai_paused_until: minutesFromNow(handoffMinutes) } : {}),
+        })
+        .eq("id", conversation.id);
+      await reply(HANDOFF_REPLY);
+    }
+    if (businessId) await enqueueOwnerAlert(businessId, conversation.id, "handoff", message.id);
+    return;
+  }
+
+  /* ── should the AI answer at all? ──
+     "human" = manual dashboard toggle.
+     ai_paused_until = owner replied from WhatsApp Business app (ONLY checked when coexistence_enabled = true). */
+  if (conversation.mode === "human") return;
+
+  if (isCoexistenceEnabled) {
+    const paused = conversation.ai_paused_until && new Date(conversation.ai_paused_until) > new Date();
+    if (paused) return;
+  }
 
   /* ══════════════════════════════════════════════════════════════
      LEGACY PATH: media_ai_enabled === false
@@ -334,7 +411,7 @@ async function handleIncoming(value: any, message: any) {
         .update({ is_first_message: false, msg_count_hour: 1, msg_count_day: 1, msg_count_month: 1 })
         .eq("id", conversation.id);
 
-      const isJustGreeting = /^(hi|hello|hey|hii|helo|hai|வணக்கம்|ஹலோ)\s*[!?.]*\s*$/i.test(text.trim());
+      const isJustGreeting = isConfiguredGreeting(text, biz?.greeting_phrases);
       if (isJustGreeting) return;
     }
 
@@ -436,13 +513,15 @@ async function handleIncoming(value: any, message: any) {
 
   /* ── escalate: complaint / unreadable / ID document → a person ── */
   if (needsHuman) {
-    if (isCoexistenceEnabled) {
-      await supabase
-        .from("conversations")
-        .update({ ai_paused_until: minutesFromNow(handoffMinutes) })
-        .eq("id", conversation.id);
-    }
+    await supabase
+      .from("conversations")
+      .update({
+        mode: "human",
+        ...(isCoexistenceEnabled ? { ai_paused_until: minutesFromNow(handoffMinutes) } : {}),
+      })
+      .eq("id", conversation.id);
     await reply(HANDOFF_REPLY);
+    if (businessId) await enqueueOwnerAlert(businessId, conversation.id, "handoff", message.id);
     return;
   }
 
@@ -471,7 +550,7 @@ async function handleIncoming(value: any, message: any) {
       .update({ is_first_message: false, msg_count_hour: 1, msg_count_day: 1, msg_count_month: 1 })
       .eq("id", conversation.id);
 
-    const isJustGreeting = /^(hi|hello|hey|hii|helo|hai|வணக்கம்|ஹலோ)\s*[!?.]*\s*$/i.test(text.trim());
+    const isJustGreeting = isConfiguredGreeting(text, biz?.greeting_phrases);
     if (isJustGreeting) return;
   }
 
@@ -586,6 +665,7 @@ async function handleEcho(value: any, echo: any) {
       ai_paused_until: minutesFromNow(biz.handoff_minutes ?? 60),
     })
     .eq("id", conversation.id);
+  await resolveOwnerAlertsForConversation(biz.id, conversation.id, ["handoff"]);
 }
 
 /* ───────────────────────── coexistence: chat-history import ───────────────────────── */

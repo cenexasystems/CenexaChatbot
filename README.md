@@ -129,6 +129,19 @@ vercel
 
 Then update your Meta webhook URL to point to your Vercel deployment.
 
+## Owner alerts setup
+
+Owner alerts can notify subscribed browsers when a customer asks for a person or sends a payment screenshot. The optional WhatsApp channel requires an approved Meta **utility** template.
+
+1. Apply the additive migrations in `supabase/migrations/` to staging first, verify the app, then apply them to the intended production database before deploying code that uses the new columns.
+   The dashboard rollout migration adds `businesses.dashboard_v2_enabled` as `false` for every business. Keep it false during the pilot; enable a business only after its owners accept the new UI. The classic `/` dashboard stays available until the two-customer daily-use milestone is met.
+2. Generate a VAPID key pair with `npx web-push generate-vapid-keys`. Save the public key as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and the private key as `VAPID_PRIVATE_KEY`; set `VAPID_SUBJECT` to a monitored `mailto:` address or a valid HTTPS contact URL. Keep the private key server-side.
+3. Set a random `CRON_SECRET` in the deployment environment. `vercel.json` calls `/api/cron/owner-alerts` every five minutes to send reminders until the conversation is answered. This schedule needs a Vercel plan that supports five-minute cron jobs; Vercel Hobby only supports daily runs.
+4. For WhatsApp alerts, create and approve a Meta utility template with three body parameters: alert type, customer phone, and dashboard link. Set its name in `WHATSAPP_OWNER_ALERT_TEMPLATE` and its approved language code in `WHATSAPP_OWNER_ALERT_LANGUAGE`.
+5. Sign in as a business admin, open **More → Owner alerts**, enable browser notifications on each device, set the owner's international-format WhatsApp number if needed, and choose quiet hours and the reminder interval.
+
+The app queues notifications during quiet hours. Push delivery also requires HTTPS and browser notification permission. Meta template delivery requires valid WhatsApp Business credentials for that business.
+
 ---
 
 ## Step-by-Step Setup Guide

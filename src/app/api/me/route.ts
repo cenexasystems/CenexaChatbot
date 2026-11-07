@@ -32,7 +32,7 @@ export async function GET() {
 
     const { data: business, error: businessError } = await admin
       .from("businesses")
-      .select("id, name, qr_image_url")
+      .select("id, name, qr_image_url, dashboard_v2_enabled")
       .eq("id", profile.business_id)
       .single();
 

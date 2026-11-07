@@ -1,12 +1,16 @@
 import { NextRequest } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { extractWamid, sendWhatsAppMessage } from "@/lib/whatsapp";
+import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const { access, response } = await requireBusinessAccess();
+  if (response) return response;
+  const { businessId, admin: adminSupabase } = access;
   const body = await request.json();
   const { status, note } = body as { status?: string; note?: string };
 
@@ -18,28 +22,15 @@ export async function POST(
     );
   }
 
-  // Create admin client inside the handler so env vars are always resolved
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    console.error("verify-payment: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
-    return Response.json({ error: "Server misconfiguration: missing env vars" }, { status: 500 });
-  }
-
-  const adminSupabase = createAdminClient(supabaseUrl, serviceKey);
-
-  // Fetch conversation using admin client (bypasses RLS)
-  const { data: conversation, error: convoError } = await adminSupabase
-    .from("conversations")
-    .select("phone, business_id, name")
-    .eq("id", id)
-    .single();
-
-  if (convoError || !conversation) {
-    console.error("verify-payment: conversation not found", id, convoError?.message);
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
-  }
+  const { conversation: rawConversation, error: convoError } = await getOwnedConversation(
+    adminSupabase,
+    businessId,
+    id,
+    "phone, business_id, name"
+  );
+  if (convoError) return Response.json({ error: "Unable to load conversation" }, { status: 500 });
+  if (!rawConversation) return conversationNotFound();
+  const conversation = rawConversation as { phone: string; business_id: string; name: string | null };
 
   const update: Record<string, unknown> = { payment_status: status };
   if (note !== undefined) update.internal_note = note;
@@ -49,12 +40,17 @@ export async function POST(
     .from("conversations")
     .update(update)
     .eq("id", id)
+    .eq("business_id", businessId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("verify-payment: DB update failed", error.message);
     return Response.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) return conversationNotFound();
+  if (status === "verified" || status === "rejected" || status === "none") {
+    await resolveOwnerAlertsForConversation(businessId, id, ["payment"]);
   }
 
   // Send WhatsApp notification for verify/reject
@@ -103,7 +99,9 @@ export async function POST(
           await adminSupabase.from("messages").insert({
             conversation_id: id,
             role: "assistant",
+            source: "dashboard",
             content: message,
+            whatsapp_msg_id: extractWamid(waResult),
           });
         } else {
           whatsapp_error = `Unexpected WhatsApp response: ${JSON.stringify(waResult)}`;
