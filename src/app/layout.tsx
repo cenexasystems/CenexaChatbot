@@ -1,9 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { PwaRuntime } from "@/components/cx/PwaRuntime";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Cenexa ChatFlow",
   description: "Manage WhatsApp conversations and your business assistant with Cenexa ChatFlow.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ChatFlow",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0B2D5E",
 };
 
 export default function RootLayout({
@@ -21,7 +40,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <PwaRuntime />
+        {children}
+      </body>
     </html>
   );
 }
