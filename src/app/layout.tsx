@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WhatsApp AI Agent",
-  description: "WhatsApp AI Agent Dashboard",
+  title: "Cenexa ChatFlow",
+  description: "Manage WhatsApp conversations and your business assistant with Cenexa ChatFlow.",
 };
 
 export default function RootLayout({

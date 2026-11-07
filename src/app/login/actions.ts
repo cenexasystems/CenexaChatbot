@@ -31,22 +31,29 @@ export async function login(formData: FormData) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-      const { data: profile } = await adminClient
+      const { data: profile, error: profileError } = await adminClient
         .from("profiles")
         .select("business_id")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Login profile check error:", profileError.message);
+        await supabase.auth.signOut();
+        return { error: "We could not load your business profile. Please try again." };
+      }
 
       if (!profile?.business_id) {
         redirect("/onboard");
       }
+      redirect("/");
     }
   } catch (err: any) {
     if (err.message && err.message.includes("NEXT_REDIRECT")) {
       throw err;
     }
     console.error("Login profile check error:", err);
-    // Proceed to redirect("/") instead of crashing if the profile check fails unexpectedly
+    return { error: "We could not load your business profile. Please try again." };
   }
 
   redirect("/");

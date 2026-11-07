@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DashboardProvider } from "@/components/cx/DashboardProvider";
 import { AppShell } from "@/components/cx/AppShell";
 
-// ChatFlow 2.0 dashboard shell: /today, /inbox, /contacts, /campaigns, /assistant, /more.
-// The old single-page dashboard at / is untouched until the switch-over.
+// ChatFlow dashboard shell. The home page sends signed-in users to /today.
 
 export const metadata: Metadata = {
   title: "Cenexa ChatFlow",

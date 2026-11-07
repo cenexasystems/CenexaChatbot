@@ -202,20 +202,20 @@ export default function OnboardPage() {
 
   /* ── Render ────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#080808] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="cx-onboard min-h-screen bg-[#EFF7FC] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Ambient background glows */}
       <div
         className="pointer-events-none fixed inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.12) 0%, transparent 70%)",
+            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(7,139,203,0.12) 0%, transparent 70%)",
         }}
       />
       <div
         className="pointer-events-none fixed bottom-0 left-0 w-[600px] h-[400px] opacity-20"
         style={{
           background:
-            "radial-gradient(ellipse at bottom left, rgba(16,185,129,0.18) 0%, transparent 70%)",
+            "radial-gradient(ellipse at bottom left, rgba(7,139,203,0.10) 0%, transparent 70%)",
         }}
       />
 

@@ -129,6 +129,42 @@
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Keep the Meta setup flow on the same light blue theme as the dashboard. */
+.cx-onboard {
+  color: #17263b;
+}
+.cx-onboard [class*="bg-[#080808]"],
+.cx-onboard [class*="bg-[#111111]"] {
+  background: #fff !important;
+  border-color: #d7e4f0 !important;
+  box-shadow: 0 18px 48px rgba(15, 75, 120, 0.12) !important;
+}
+.cx-onboard [class*="text-white"] { color: #475569 !important; }
+.cx-onboard h1, .cx-onboard h2, .cx-onboard .text-white { color: #17263b !important; }
+.cx-onboard [class*="bg-white/[0.03]"],
+.cx-onboard [class*="bg-white/[0.04]"],
+.cx-onboard [class*="bg-white/[0.05]"],
+.cx-onboard [class*="bg-white/[0.06]"] { background: #f2f7fc !important; }
+.cx-onboard [class*="border-white"] { border-color: #d7e4f0 !important; }
+.cx-onboard [class*="bg-emerald"] { background-color: #e8f1fd !important; }
+.cx-onboard div[class*="bg-emerald-500 w-6"],
+.cx-onboard div[class*="bg-emerald-400 w-8"] { background-color: #078bcb !important; }
+.cx-onboard [class*="text-emerald"] { color: #087dbb !important; }
+.cx-onboard [class*="border-emerald"] { border-color: #b9ddf2 !important; }
+.cx-onboard [class*="border-t-emerald"] { border-top-color: #078bcb !important; }
+.cx-onboard [class*="shadow-emerald"] { box-shadow: 0 4px 14px rgba(7, 139, 203, 0.14) !important; }
+.cx-onboard div[class*="bg-emerald"] svg { stroke: #087dbb !important; }
+.cx-onboard svg[stroke="#10b981"] { stroke: #087dbb !important; }
+.cx-onboard button [class*="text-white"] { color: #fff !important; }
+.cx-onboard button[class*="bg-emerald"] {
+  background: #078bcb !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(7, 139, 203, 0.2) !important;
+}
+.cx-onboard button[class*="bg-emerald"]:hover { background: #0876ae !important; }
+.cx-onboard input { color: #17263b !important; }
+.cx-onboard input::placeholder { color: #94a3b8 !important; }
 .cx-root .tabular { font-variant-numeric: tabular-nums; }
 /* Small bold uppercase label used for section and column headings. */
 .cx-root .eyebrow {

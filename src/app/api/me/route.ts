@@ -23,21 +23,46 @@ export async function GET() {
       .from("profiles")
       .select("business_id")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (profileError || !profile?.business_id) {
-      console.error("[/api/me] Profile not found for user:", user.id, profileError?.message);
+    if (profileError) {
+      console.error("[/api/me] Could not read profile:", profileError.message);
+      return NextResponse.json({ error: "Could not load your profile" }, { status: 500 });
+    }
+
+    if (!profile?.business_id) {
       return NextResponse.json({ error: "Profile or business not found" }, { status: 404 });
     }
 
-    const { data: business, error: businessError } = await admin
+    let { data: business, error: businessError } = await admin
       .from("businesses")
       .select("id, name, qr_image_url, dashboard_v2_enabled")
       .eq("id", profile.business_id)
-      .single();
+      .maybeSingle();
 
-    if (businessError || !business) {
-      console.error("[/api/me] Business not found:", profile.business_id, businessError?.message);
+    // The dashboard rollout column is additive. Older production databases can
+    // still serve the dashboard while that migration is being applied.
+    if (
+      businessError &&
+      (businessError.code === "PGRST204" || businessError.code === "42703") &&
+      businessError.message.includes("dashboard_v2_enabled")
+    ) {
+      const legacy = await admin
+        .from("businesses")
+        .select("id, name, qr_image_url")
+        .eq("id", profile.business_id)
+        .maybeSingle();
+      business = legacy.data ? { ...legacy.data, dashboard_v2_enabled: false } : null;
+      businessError = legacy.error;
+    }
+
+    if (businessError) {
+      console.error("[/api/me] Could not read business:", profile.business_id, businessError.message);
+      return NextResponse.json({ error: "Could not load your business" }, { status: 500 });
+    }
+
+    if (!business) {
+      console.error("[/api/me] Business not found:", profile.business_id);
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
