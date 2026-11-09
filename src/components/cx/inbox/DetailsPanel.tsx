@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConversationWithLastMessage } from "@/lib/types";
 import { useDashboard } from "../DashboardProvider";
 import { Avatar, Button, Field, SectionLabel, Status, StatusBox, Tag } from "../ui";
@@ -16,12 +16,27 @@ export function DetailsPanel({
   onPayment: (status: "verified" | "rejected") => void;
   paymentBusy: boolean;
 }) {
-  const { business, patch, sendQR, now } = useDashboard();
+  const { business, patch, sendQR, now, role } = useDashboard();
   const [tag, setTag] = useState("");
   const [note, setNote] = useState(c.internal_note ?? "");
   const [savingNote, setSavingNote] = useState(false);
   const [sendingQR, setSendingQR] = useState(false);
+  const [members, setMembers] = useState<Array<{ id: string; name: string | null; email: string | null }>>([]);
   const qrInput = useRef<HTMLInputElement>(null);
+  const canReply = !business?.strict_roles || ["admin", "support", "sales"].includes(role);
+  const canVerifyPayment = !business?.strict_roles || ["admin", "accounts"].includes(role);
+
+  useEffect(() => {
+    if (!business?.modules_enabled?.team) return;
+    let active = true;
+    fetch("/api/team").then(async (response) => ({ response, data: await response.json().catch(() => ({})) })).then(({ response, data }) => { if (active && response.ok) setMembers(data.members?.filter((member: { status: string }) => member.status === "active") ?? []); }).catch(() => {});
+    return () => { active = false; };
+  }, [business?.modules_enabled?.team]);
+
+  async function assignTo(value: string) {
+    const ok = await patch(c.id, { assigned_to: value || null });
+    onToast(ok ? "Assignment updated" : "Assignment not saved", ok ? "ok" : "error");
+  }
 
   async function addTag() {
     const v = tag.trim();
@@ -74,6 +89,7 @@ export function DetailsPanel({
         <dl>
           <Field label="Replies by">{paused ? <Status>AI paused</Status> : c.mode === "agent" ? <Status tone="success">AI</Status> : <Status tone="dark">Team</Status>}</Field>
           <Field label="First contact">{formatDayLabel(c.created_at, now)}</Field>
+          {business?.modules_enabled?.team && <Field label="Assigned to"><select className="max-w-full rounded-md border border-line-strong bg-surface px-2 py-1 text-[11px]" value={c.assigned_to ?? ""} disabled={!canReply} onChange={(e) => void assignTo(e.target.value)}><option value="">Unassigned</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email || "Team member"}</option>)}</select></Field>}
           <Field label="Messages today"><span className="tabular">{c.msg_count_day ?? 0}</span></Field>
           <Field label="This month"><span className="tabular">{c.msg_count_month ?? 0}</span></Field>
         </dl>
@@ -85,10 +101,10 @@ export function DetailsPanel({
           <div className="rounded-[10px] border border-attention/30 bg-attention-tint p-3">
             <StatusBox tone="attention">Verify screenshot</StatusBox>
             <p className="text-[12.5px] text-ink-soft mt-2">Match it in your bank or UPI app. The customer is messaged either way.</p>
-            <div className="grid grid-cols-2 gap-2 mt-3">
+            {canVerifyPayment && <div className="grid grid-cols-2 gap-2 mt-3">
               <Button variant="danger" size="sm" disabled={paymentBusy} onClick={() => onPayment("rejected")}>Reject</Button>
               <Button variant="primary" size="sm" icon="check" disabled={paymentBusy} onClick={() => onPayment("verified")}>Confirm</Button>
-            </div>
+            </div>}
           </div>
         ) : (
           <>
@@ -104,8 +120,10 @@ export function DetailsPanel({
                   <Status>None</Status>
                 )}
               </Field>
+              {c.payment_amount != null && <Field label="Amount"><span className="tabular">₹{Number(c.payment_amount).toLocaleString("en-IN")}</span></Field>}
             </dl>
-            <input ref={qrInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && doSendQR(e.target.files[0])} />
+            {canReply && <input ref={qrInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && doSendQR(e.target.files[0])} />}
+            {canReply && <>
             <div className="flex gap-2 mt-2">
               <Button
                 variant="primary"
@@ -121,11 +139,12 @@ export function DetailsPanel({
                 <Button size="sm" variant="secondary" onClick={() => qrInput.current?.click()}>Change</Button>
               )}
             </div>
+            </>}
           </>
         )}
       </section>
 
-      <section className="px-4 py-3">
+      {canReply && <section className="px-4 py-3">
         <SectionLabel>Tags</SectionLabel>
         <div className="flex flex-wrap gap-1.5 mb-2">
           {(c.tags ?? []).length === 0 && <p className="text-[12.5px] text-ink-faint">No tags</p>}
@@ -137,9 +156,9 @@ export function DetailsPanel({
           <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Add tag" className="flex-1 min-w-0 h-8 px-2.5 rounded-lg border border-line-strong text-[12.5px] placeholder:text-ink-faint focus:outline-none focus:border-accent" aria-label="New tag" />
           <Button type="submit" size="sm" disabled={!tag.trim()}>Add</Button>
         </form>
-      </section>
+      </section>}
 
-      <section className="px-4 py-3">
+      {canReply && <section className="px-4 py-3">
         <SectionLabel>Internal note</SectionLabel>
         <textarea
           value={note}
@@ -154,7 +173,7 @@ export function DetailsPanel({
             <Button size="sm" variant="primary" onClick={saveNote} disabled={savingNote}>{savingNote ? "Saving…" : "Save"}</Button>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

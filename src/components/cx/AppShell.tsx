@@ -19,7 +19,6 @@ const MAIN: Tab[] = [
   { href: "/assistant", labelKey: "nav.assistant", icon: "assistant" },
   { href: "/more", labelKey: "nav.more", icon: "settings" },
 ];
-const MOBILE: Tab[] = [...MAIN.slice(0, 5), { href: "/more", labelKey: "nav.more", icon: "more" }];
 
 /** Cenexa mark in a white tile, as in the logo. */
 export function BrandMark({ size = 44 }: { size?: number }) {
@@ -33,9 +32,16 @@ export function BrandMark({ size = 44 }: { size?: number }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { business, loading, error, conversations, now, t, demo } = useDashboard();
+  const { business, loading, error, conversations, now, t, demo, role } = useDashboard();
   const waiting = conversations.filter((c) => needsYou(c, now)).length;
   const inChat = /^\/inbox\/.+/.test(pathname);
+  const visibleMain = MAIN.filter((tab) => {
+    if (tab.href === "/campaigns") return role === "admin";
+    if (tab.href === "/contacts") return role === "admin" || role === "sales";
+    if (tab.href === "/assistant") return role === "admin";
+    return true;
+  });
+  const visibleMobile = [...visibleMain.filter((tab) => tab.href !== "/more").slice(0, 5), visibleMain.find((tab) => tab.href === "/more")!];
 
   if (loading) {
     return (
@@ -49,9 +55,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (error) {
     return (
       <div className="h-dvh flex flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="eyebrow !text-danger">Connection error</p>
+        <p className="eyebrow !text-danger">{error.includes("business is suspended") ? "Business suspended" : "Connection error"}</p>
         <p className="text-[14px] text-ink-soft max-w-sm">{error}</p>
-        <Button variant="primary" onClick={() => location.reload()}>Retry</Button>
+        {error.includes("business is suspended") ? <form action={logout}><Button variant="primary">Sign out</Button></form> : <Button variant="primary" onClick={() => location.reload()}>Retry</Button>}
       </div>
     );
   }
@@ -71,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <nav aria-label="Main" className="flex-1 overflow-y-auto px-4 pt-5 space-y-1.5">
-          {MAIN.map((tab) => (
+          {visibleMain.map((tab) => (
             <SideItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
           ))}
         </nav>
@@ -98,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Icon rail (tablet) */}
       <nav aria-label="Main" className="hidden md:flex lg:hidden w-[76px] shrink-0 flex-col items-center bg-sidebar py-4 gap-1.5">
         <Link href="/today" className="mb-4" aria-label="Cenexa ChatFlow"><BrandMark size={44} /></Link>
-        {MAIN.map((tab) => (
+        {visibleMain.map((tab) => (
           <RailItem key={tab.href} tab={tab} label={t(tab.labelKey)} active={pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href)} badge={badgeFor(tab.href)} />
         ))}
       </nav>
@@ -118,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           className={cx("md:hidden shrink-0 border-t border-line bg-surface grid grid-cols-6", inChat && "hidden")}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          {MOBILE.map((tab) => {
+          {visibleMobile.map((tab) => {
             const active = pathname === "/" ? tab.href === "/today" : pathname.startsWith(tab.href);
             const badge = badgeFor(tab.href);
             return (

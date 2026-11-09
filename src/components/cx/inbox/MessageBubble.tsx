@@ -25,6 +25,8 @@ export function MessageBubble({
   onRejectPayment,
   onDelete,
   busy,
+  canDelete = true,
+  canVerifyPayment = true,
 }: {
   msg: Message;
   paymentPending: boolean;
@@ -32,6 +34,8 @@ export function MessageBubble({
   onRejectPayment: () => void;
   onDelete: () => void;
   busy: boolean;
+  canDelete?: boolean;
+  canVerifyPayment?: boolean;
 }) {
   const sender = senderOf(msg);
   const inbound = sender === "customer";
@@ -62,7 +66,7 @@ export function MessageBubble({
               )}
             </span>
           )}
-          {!pending && (
+          {!pending && canDelete && (
             <button
               onClick={onDelete}
               className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-ink-faint hover:text-danger transition-opacity"
@@ -84,6 +88,7 @@ export function MessageBubble({
             busy={busy}
             onConfirm={onConfirmPayment}
             onReject={onRejectPayment}
+            canVerify={canVerifyPayment}
           />
         )}
       </div>
@@ -153,6 +158,7 @@ function PaymentCard({
   busy,
   onConfirm,
   onReject,
+  canVerify,
 }: {
   payment: PaymentInfo | null;
   confidence?: "low" | "medium" | "high";
@@ -160,6 +166,7 @@ function PaymentCard({
   busy: boolean;
   onConfirm: () => void;
   onReject: () => void;
+  canVerify: boolean;
 }) {
   const amount = payment?.amount ? Number(String(payment.amount).replace(/[^\d.]/g, "")) : NaN;
   return (
@@ -186,7 +193,7 @@ function PaymentCard({
         <Icon name="alert" size={12} className="shrink-0 mt-0.5" />
         A screenshot is not proof. Match it in your bank or UPI app first.
       </p>
-      {pending && (
+      {pending && canVerify && (
         <div className="grid grid-cols-2 gap-2 px-3 pb-3">
           <Button variant="danger" size="sm" onClick={onReject} disabled={busy}>Reject</Button>
           <Button variant="primary" size="sm" icon="check" onClick={onConfirm} disabled={busy}>Confirm</Button>

@@ -18,6 +18,7 @@
 | `onboarding_type` | `text` | `'api'` | `'api'` or `'coexistence'` — records how the number was registered |
 | `coexistence_synced_at` | `timestamptz` | `null` | Guards the once-only contacts+history sync |
 | `disconnected_reason` | `text` | `null` | Set by account_update PARTNER_REMOVED/ACCOUNT_OFFBOARDED |
+| `modules_enabled` | `jsonb` | `{}` | Per-business module switches; absent/false keys stay off |
 
 **Signature verification mode** (env var, not a DB flag):
 
@@ -178,3 +179,227 @@ File: `supabase/migrations/ROLLBACK_coexistence_and_media_ai.sql` (created in Ph
 - Job queue with retries (currently `after()` — Meta will not retry on failure).
 - Billing / usage metering for voice/image analyses.
 - Meta v4 Embedded Signup config (configured in Meta's dashboard, not in code).
+# Phase 0: Module flags and permissions
+
+The `businesses.modules_enabled` JSONB column stores per-business switches. A
+missing key or `false` means the module is off. Current keys are `templates`,
+`contacts`, `campaigns`, `automations`, `reports`, `team`, and `integrations`. Apply
+`supabase/migrations/20261109_module_flags.sql` to staging before deploying code
+that reads it; the migration is idempotent and leaves every module disabled by
+default. The `/api/me` response includes the signed-in user's ID and role plus
+the business module flags. Phase 0 permission checks preserve the existing
+admin-only assistant and owner-alert settings actions.
+
+The rollback companion removes the column. Use it only before enabling any
+module flags; otherwise retain the column and disable individual modules by
+setting their values to `false`.
+
+For this rollout, apply each additive migration directly to production only
+after confirming it has not already been applied. Do not run the staging
+bootstrap file against production.
+
+## Phase 1: Message templates
+
+Apply `supabase/migrations/20261109_message_templates.sql` to production before
+deploying Phase 1. The `message_templates` table has RLS enabled and no browser
+policies; reads and writes use business-scoped server routes. Enable the module
+only after deployment with:
+
+```sql
+update public.businesses
+set modules_enabled = coalesce(modules_enabled, '{}'::jsonb) || '{"templates": true}'::jsonb
+where id = '<business-uuid>';
+```
+
+Create, sync, and delete use the tenant's WABA and access token. Meta rejects
+these operations if the token lacks WhatsApp Business Management permission.
+Template send is available to all four tenant roles; management is admin/sales
+only. Marketing sends remain blocked until Phase 2 adds recorded contact opt-in.
+Roll back by setting the tenant flag to false; the table can remain in place.
+
+## Phase 2: Contacts and customer timeline
+
+Apply `supabase/migrations/20261109_contacts.sql` after the module-flags
+migration and before deploying Phase 2. It creates contacts, groups, group
+membership, and activity events with RLS on and no browser policies, adds the
+optional payment amount, and backfills one record per distinct business/phone.
+The final query must report `missing_contact_keys = 0`. Keep the module disabled
+until a pilot business is ready:
+
+```sql
+update public.businesses
+set modules_enabled = coalesce(modules_enabled, '{}'::jsonb) || '{"contacts": true}'::jsonb
+where id = '<business-uuid>';
+```
+
+CSV imports require explicit opt-in confirmation and save the stated consent
+source. Inbound `STOP` and `UNSUBSCRIBE` messages set `opt_out_at`. Payment
+amounts are optional and start recording from this deployment onward; old
+payment statuses have no historical amount or activity log.
+
+## Phase 3: Campaigns
+
+Production migration order is `20261109_module_flags.sql`,
+`20261109_message_templates.sql`, `20261109_contacts.sql`, then
+`20261109_campaigns_automations.sql`. The campaign migration depends on both
+templates and contacts. Apply it only after the contacts migration's final
+`missing_contact_keys` check reports zero.
+
+The campaign feature stays off unless `modules_enabled.campaigns` is true.
+Sending also requires an approved template, stored opt-in, an active WhatsApp
+connection, and a per-business send cap. `campaign_sending_paused` is the
+emergency stop. The migration creates an empty `campaign_pricing` table on
+purpose: before enabling campaigns, insert verified current Meta rates and the
+configured Cenexa fee by calling code and category. Update `as_of` whenever
+the rate card changes. The preview is an estimate; it does not debit or collect
+money. Confirm current WhatsApp rates in Meta's [official pricing page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing).
+
+Campaign sends run from the existing `CRON_SECRET` protected five-minute
+owner-alert job. Confirm the production host supports that schedule. Campaign
+delivery receipts are matched by Meta message ID, and replies/payment
+verification are attributed for seven days. Campaign recipients are not added
+to the conversation history unless they reply.
+
+## Phase 4: Automations
+
+Automations are also off unless `modules_enabled.automations` is true. The
+fixed rule catalog supports unanswered follow-up, payment reminder, review
+request after verification, and a manually scheduled contact reminder. Every
+send requires opt-in, respects Asia/Kolkata quiet hours and the 24-hour WhatsApp
+customer-service window, and uses an approved template outside that window.
+An atomic per-contact daily slot prevents concurrent workers from sending more
+than one automated message to a contact per local day. Customer replies,
+payment verification, and human takeover cancel queued runs. Start with the
+rules disabled, review dry-run candidates, then enable only the selected rules
+for a pilot business.
+
+The rollback file `ROLLBACK_20261109_campaigns_automations.sql` removes these
+tables and the added `messages.source` value. Prefer disabling both module
+flags and pausing campaign sending before rolling back application code.
+
+## Phase 5: Reports
+
+Apply `20261109_reports_team.sql` after contacts, campaigns/automations, and
+owner alerts. Reports are available to admin and accounts roles when
+`modules_enabled.reports` is true. The SQL function aggregates metrics per
+business and day using the existing `owner_alert_timezone` setting (Asia/
+Kolkata by default). Payment and sales history is limited by
+`reporting_history_start_date`; it defaults to the migration date because older
+payment changes were not logged. If the contacts/payment-history launch date is
+known and earlier, set this column to that date so the label reflects the real
+start. CSV output comes from the same database rows shown in the UI.
+
+## Phase 6: Team and roles
+
+The same migration adds profile email/status fields, invitation timestamps,
+the strict-role switch, assignment indexes, and a database-locked update that
+prevents concurrent changes from removing the last active admin. The preflight
+stops if a profile ID has no matching Supabase Auth user; resolve the
+`profile_auth_id_mismatches` check before retrying. Invitations use Supabase
+Auth email delivery and its redirect allowlist for `/login`. Invited members
+become active on first sign-in. Deactivation marks the profile disabled and
+applies an Auth ban; business API requests also reject disabled profiles.
+Set the Supabase **Invite user** email link to
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite` and include
+the production `/auth/confirm` URL in the Auth redirect allowlist. The route
+verifies the invite token, then asks the invited teammate to set a password.
+
+`strict_roles` defaults to false so existing businesses retain their current
+behavior. Admins can enable it in Settings → Team after reviewing the role
+assignments:
+
+| Action | Admin | Support | Sales | Accounts |
+|---|---:|---:|---:|---:|
+| Reply, notes, tags, assignment, reply mode | Yes | Yes | Yes | No |
+| Verify payments | Yes | No | No | Yes |
+| Manage templates | Yes | No | Yes | No |
+| Send campaigns, manage automations | Yes | No | No | No |
+| View reports | Yes | No | No | Yes |
+| Manage team and assistant settings | Yes | No | No | No |
+
+Enable Reports and Team only for the intended business after deploying the app:
+
+```sql
+update public.businesses
+set modules_enabled = coalesce(modules_enabled, '{}'::jsonb)
+  || '{"reports": true, "team": true}'::jsonb
+where id = '<business-uuid>';
+```
+
+Strict enforcement is a separate per-business choice:
+
+```sql
+update public.businesses set strict_roles = true where id = '<business-uuid>';
+```
+
+The Phase 5/6 migration depends on contacts, activity events, campaigns,
+automations, and owner alerts. Apply missing migrations in this order: module
+flags, templates, contacts, campaigns/automations, reports/team. The rollback
+companion is `ROLLBACK_20261109_reports_team.sql`; avoid it after inviting or
+deactivating staff because it removes their stored status fields.
+
+## Phase 7: Integrations and exports
+
+Apply `20261109_integrations.sql` after Contacts. It creates `integration_links`
+with RLS and no browser policies. Enable the `integrations` module per business
+only after deploying the app. Admins can create source-specific `wa.me` links;
+the browser generates the QR locally and the page provides a copyable website
+button snippet. The webhook records a source only when the first message
+contains an exact code owned by that business. Attribution is best effort
+because customers can edit the prefilled text. Contacts and Reports export
+UTF-8 CSV. Shopify and live Google Sheets sync remain Later; CSV export does
+not connect to a Google account.
+
+## Platform track: Cenexa administration
+
+Apply `20261109_platform_admin.sql` after the campaign/automation migration.
+It creates separate platform admin identities, append-only audit records,
+cron heartbeats and daily usage rollups. New rows are RLS protected with no
+browser policies. The platform console returns tenant metadata and counts only;
+it does not return conversation bodies, access tokens, or provider API keys.
+Tenant changes require confirmation and a reason. Database functions commit
+each setting change with its audit row in one transaction.
+
+The first owner is seeded manually after that Supabase Auth user signs in and
+enrolls a TOTP factor. The user can open `/admin/mfa` while signed in to enroll.
+Then insert the Auth user UUID in Supabase SQL Editor:
+
+```sql
+insert into public.platform_admins (user_id, role)
+values ('<auth-user-uuid>', 'owner');
+```
+
+Every platform API request checks both the enabled `platform_admins` row and
+the current `aal2` MFA level. Owner can manage plans, tenant suspension and
+platform admins. Support can change feature modules. Read-only can view only.
+Suspension sets `platform_suspended`, blocks tenant APIs and causes the
+WhatsApp webhook to skip the business without changing its connection status.
+The existing five-minute owner-alert cron records its heartbeat and refreshes
+daily usage counts. AI-call counts are a reply-based proxy, and media AI counts
+are recorded analyses; this is operational usage metering, not token-level
+billing. If the cron schedule is not running, heartbeat remains
+stale and queued campaigns/automations do not drain.
+
+## Phase 8: Close-out
+
+The Integrations settings replace the old Planned row. Wallet/payment collection
+and invoices remain outside this release; Shopify and live Google Sheets are
+shown as Later with the OAuth/review dependency. English and Tamil remain the
+available translated navigation/Today/filter strings. Hindi is not offered
+until translations and the rest of the new screens receive native-speaker
+review. New environment variables are not required; the platform uses the
+existing Supabase and `CRON_SECRET` settings.
+
+Security boundaries: new tables have RLS and no browser policies; export routes
+are tenant scoped; CSV import and queued sending have database-backed limits;
+cron access requires `CRON_SECRET`; platform responses omit secrets and chat
+content. Apply production migrations before deploying code that queries these
+tables. For this final track, apply `20261109_integrations.sql` followed by
+`20261109_platform_admin.sql`, then deploy. Keep Integrations disabled until a
+business is ready. Review the platform owner seed UUID carefully before
+running the one-time insert.
+
+Rollback companions are `ROLLBACK_20261109_integrations.sql` and
+`ROLLBACK_20261109_platform_admin.sql`. Disable the module and platform
+controls before reverting code; the platform rollback removes audit history,
+admin identities, usage rollups, and the suspension flag.

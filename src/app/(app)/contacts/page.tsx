@@ -2,15 +2,22 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/components/cx/DashboardProvider";
-import { Page, Roadmap } from "@/components/cx/Page";
+import { Page } from "@/components/cx/Page";
 import { Avatar, Button, Chip, EmptyState, Panel, Status, Tag } from "@/components/cx/ui";
 import { Icon } from "@/components/cx/icons";
 import { formatDayLabel, formatPhone, timeAgo } from "@/lib/inbox";
+import { ContactsManager } from "@/components/cx/ContactsManager";
 
 // Written out in full so Tailwind can find the class names.
 const COLS_MD = "md:grid-cols-[minmax(0,1.4fr)_150px_minmax(0,1fr)_110px_90px]";
 
 export default function ContactsPage() {
+  const { business } = useDashboard();
+  if (business?.modules_enabled?.contacts === true) return <ContactsManager />;
+  return <LegacyContactsPage />;
+}
+
+function LegacyContactsPage() {
   const { conversations, now } = useDashboard();
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
@@ -37,7 +44,7 @@ export default function ContactsPage() {
       section="Customers"
       title="Contacts"
       subtitle={`${conversations.length} total`}
-      action={<Button icon="upload" disabled title="Coming soon">Import CSV</Button>}
+      action={<Button icon="upload" disabled title="Enable the contacts module for this business">Contacts off</Button>}
     >
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <label className="flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface sm:w-80 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
@@ -94,14 +101,6 @@ export default function ContactsPage() {
         )}
       </Panel>
 
-      <Panel className="mt-5" title="Roadmap" icon="flow">
-        <Roadmap
-          items={[
-            { icon: "upload", title: "Import contacts", body: "CSV upload, phone-app contact sync, and old broadcast lists as groups." },
-            { icon: "history", title: "Customer timeline", body: "Every chat, payment and campaign for one customer on one page." },
-          ]}
-        />
-      </Panel>
     </Page>
   );
 }

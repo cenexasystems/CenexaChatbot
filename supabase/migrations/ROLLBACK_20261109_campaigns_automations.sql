@@ -1,0 +1,15 @@
+drop function if exists public.claim_campaign_recipients(integer);
+drop function if exists public.claim_automation_runs(integer);
+drop function if exists public.consume_campaign_daily_slot(uuid,date,integer);
+alter table public.messages drop constraint if exists messages_source_check;
+alter table public.messages add constraint messages_source_check check (source in ('customer','ai','dashboard','business_app','history') or source is null);
+drop table if exists public.automation_runs;
+drop table if exists public.automations;
+drop table if exists public.campaign_daily_usage;
+drop table if exists public.campaign_pricing;
+drop table if exists public.campaign_recipients;
+drop table if exists public.campaigns;
+alter table public.businesses drop column if exists campaign_sending_paused;
+alter table public.businesses drop column if exists campaign_daily_send_cap;
+drop function if exists public.consume_automation_daily_slot(uuid,date);
+drop table if exists public.automation_daily_usage;

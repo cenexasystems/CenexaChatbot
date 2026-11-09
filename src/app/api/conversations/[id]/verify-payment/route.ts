@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
-import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess, requireStrictPermission } from "@/lib/api-auth";
 import { extractWamid, sendWhatsAppMessage } from "@/lib/whatsapp";
 import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
+import { recordContactActivity } from "@/lib/activity";
+import { enqueueAutomationForConversation, cancelAutomationForConversation } from "@/lib/automation-queue";
 
 export async function POST(
   request: NextRequest,
@@ -10,9 +12,10 @@ export async function POST(
   const { id } = await params;
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
+  const denied = requireStrictPermission(access, "payment_verify"); if (denied) return denied;
   const { businessId, admin: adminSupabase } = access;
   const body = await request.json();
-  const { status, note } = body as { status?: string; note?: string };
+  const { status, note, amount } = body as { status?: string; note?: string; amount?: number | string | null };
 
   const validStatuses = ["none", "pending", "verified", "rejected"];
   if (!status || !validStatuses.includes(status)) {
@@ -21,6 +24,11 @@ export async function POST(
       { status: 400 }
     );
   }
+  const parsedAmount = amount === undefined || amount === null || amount === "" ? null : Number(amount);
+  if (parsedAmount !== null && (!Number.isFinite(parsedAmount) || parsedAmount < 0 || parsedAmount > 1_000_000_000)) {
+    return Response.json({ error: "Amount must be a valid non-negative number" }, { status: 400 });
+  }
+  if (parsedAmount !== null && status !== "verified") return Response.json({ error: "An amount can only be recorded when verifying a payment" }, { status: 400 });
 
   const { conversation: rawConversation, error: convoError } = await getOwnedConversation(
     adminSupabase,
@@ -33,6 +41,7 @@ export async function POST(
   const conversation = rawConversation as { phone: string; business_id: string; name: string | null };
 
   const update: Record<string, unknown> = { payment_status: status };
+  if (status === "verified") update.payment_amount = parsedAmount;
   if (note !== undefined) update.internal_note = note;
 
   // Update payment status using admin client
@@ -47,6 +56,20 @@ export async function POST(
   if (error) {
     console.error("verify-payment: DB update failed", error.message);
     return Response.json({ error: error.message }, { status: 500 });
+  }
+  await recordContactActivity(adminSupabase, businessId, id, `payment_${status}`, { amount: parsedAmount });
+  if (status === "verified") {
+    await cancelAutomationForConversation(businessId, id, "Payment arrived");
+    await enqueueAutomationForConversation(businessId, id, "review_request", `payment-verified:${id}:${Date.now()}`);
+    const { data: flags } = await adminSupabase.from("businesses").select("modules_enabled").eq("id", businessId).maybeSingle();
+    if (flags?.modules_enabled?.campaigns === true) {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
+      const { data: recipient } = await adminSupabase.from("campaign_recipients").select("id,campaign_id,contact_id,status").eq("business_id", businessId).eq("phone", conversation.phone).gte("sent_at", since).in("status", ["sent", "delivered", "read", "replied"]).order("sent_at", { ascending: false }).limit(1).maybeSingle();
+      if (recipient) {
+        await adminSupabase.from("campaign_recipients").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", recipient.id).eq("business_id", businessId);
+        await adminSupabase.from("activity_events").insert({ business_id: businessId, contact_id: recipient.contact_id, conversation_id: id, event_type: "campaign_paid", details: { campaign_id: recipient.campaign_id, attribution: "within 7 days" } });
+      }
+    }
   }
   if (!data) return conversationNotFound();
   if (status === "verified" || status === "rejected" || status === "none") {

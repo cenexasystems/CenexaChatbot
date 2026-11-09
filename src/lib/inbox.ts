@@ -11,6 +11,7 @@ export function senderOf(msg: Pick<Message, "role" | "source">): Sender {
     case "ai":
       return "ai";
     case "dashboard":
+    case "template":
       return "team";
     case "business_app":
       return "phone";

@@ -9,11 +9,14 @@ import type { Business, ConversationWithLastMessage, Message } from "@/lib/types
 import { DEMO_MODE, buildDemo, demoBusiness } from "@/lib/demo-data";
 import { translate, type Lang, type StringKey } from "@/lib/i18n";
 
-type Patch = Partial<Pick<ConversationWithLastMessage, "mode" | "tags" | "internal_note" | "payment_status" | "ai_paused_until">>;
+type Patch = Partial<Pick<ConversationWithLastMessage, "mode" | "assigned_to" | "tags" | "internal_note" | "payment_status" | "ai_paused_until">>;
 
 type Ctx = {
   demo: boolean;
   business: Business | null;
+  userId: string | null;
+  role: string;
+  updateBusiness: (patch: Partial<Business>) => void;
   loading: boolean;
   error: string | null;
   conversations: ConversationWithLastMessage[];
@@ -29,7 +32,7 @@ type Ctx = {
   sendQR: (id: string, newQrFile?: File) => Promise<void>;
   patch: (id: string, p: Patch) => Promise<boolean>;
   changeMode: (id: string, mode: "agent" | "human") => Promise<boolean>;
-  verifyPayment: (id: string, status: "verified" | "rejected") => Promise<{ ok: boolean; message: string }>;
+  verifyPayment: (id: string, status: "verified" | "rejected", amount?: string) => Promise<{ ok: boolean; message: string }>;
   deleteMessage: (id: string, msgId: string) => Promise<void>;
 };
 
@@ -61,6 +64,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => (DEMO_MODE ? null : createClient()), []);
   const [demoData] = useState(() => (DEMO_MODE ? buildDemo() : null));
   const [business, setBusiness] = useState<Business | null>(DEMO_MODE ? demoBusiness : null);
+  const [userId, setUserId] = useState<string | null>(DEMO_MODE ? "00000000-0000-4000-8000-000000000001" : null);
+  const [role, setRole] = useState(DEMO_MODE ? "admin" : "support");
   const [fetching, setFetching] = useState(!DEMO_MODE);
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>(demoData?.conversations ?? []);
@@ -70,6 +75,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const convoIds = useRef(new Set<string>());
   const loading = !mounted || fetching;
   const businessId = business?.id;
+  const updateBusiness = useCallback((patch: Partial<Business>) => setBusiness((current) => current ? { ...current, ...patch } : current), []);
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
@@ -97,9 +103,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       .then(async (res) => {
         if (res.status === 401) return router.push("/login");
         if (res.status === 404) return router.push("/onboard");
-        if (!res.ok) throw new Error(`Could not load your business (${res.status})`);
+        if (!res.ok) {
+          const problem = await res.json().catch(() => null);
+          throw new Error(problem?.error ?? `Could not load your business (${res.status})`);
+        }
         const data = await res.json();
         setBusiness(data.business);
+        setUserId(data.user?.id ?? null);
+        setRole(data.user?.role ?? "support");
       })
       .catch((e) => {
         if (e.name !== "AbortError") setError(e.message || "Could not load your business");
@@ -327,9 +338,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 
   const verifyPayment = useCallback(
-    async (id: string, status: "verified" | "rejected") => {
+    async (id: string, status: "verified" | "rejected", amount?: string) => {
       if (DEMO_MODE) {
-        updateConvo(id, { payment_status: status });
+        updateConvo(id, { payment_status: status, ...(amount ? { payment_amount: Number(amount) } : {}) });
         appendLocal(id, {
           content: status === "verified" ? "Payment received, thank you! Your booking is confirmed." : "We couldn't confirm this payment. Please check and send it again.",
         });
@@ -338,7 +349,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`/api/conversations/${id}/verify-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, amount }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, message: data.error || `Could not update payment (${res.status})` };
@@ -361,6 +372,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     demo: DEMO_MODE,
     business,
+    userId,
+    role,
+    updateBusiness,
     loading,
     error,
     conversations,

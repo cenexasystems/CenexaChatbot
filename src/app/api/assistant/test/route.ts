@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireBusinessAccess } from "@/lib/api-auth";
+import { requireBusinessAccess, requirePermission } from "@/lib/api-auth";
 import { getAIResponse } from "@/lib/ai";
 import { appendHandoffRules, rewriteConfiguredUrls } from "@/lib/assistant-config";
 
@@ -8,8 +8,9 @@ type TestMessage = { role: "user" | "assistant"; content: string };
 export async function POST(request: NextRequest) {
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
-  const { businessId, role, admin } = access;
-  if (role !== "admin") return Response.json({ error: "Only a business admin can run assistant tests" }, { status: 403 });
+  const denied = requirePermission(access, "assistant_test");
+  if (denied) return denied;
+  const { businessId, admin } = access;
 
   let messages: TestMessage[];
   try {

@@ -32,6 +32,7 @@ export const demoBusiness: Business = {
   onboarding_type: "coexistence",
   coexistence_enabled: true,
   media_ai_enabled: true,
+  modules_enabled: { templates: true, reports: true, team: true },
   handoff_minutes: 60,
   created_at: iso(90 * 24 * 60 * MIN),
 };
@@ -246,4 +247,22 @@ export function buildDemo(): { conversations: ConversationWithLastMessage[]; mes
     } satisfies ConversationWithLastMessage;
   });
   return { conversations, messages };
+}
+
+export const demoTeamMembers = [
+  { id: "00000000-0000-4000-8000-000000000001", name: "Anu", email: "anu@example.test", role: "admin" as const, status: "active" as const, invited_at: null },
+  { id: "00000000-0000-4000-8000-000000000002", name: "Meena", email: "meena@example.test", role: "support" as const, status: "active" as const, invited_at: null },
+  { id: "00000000-0000-4000-8000-000000000003", name: "Arjun", email: "arjun@example.test", role: "sales" as const, status: "invited" as const, invited_at: iso(3 * MIN) },
+];
+
+export function demoReportRows(day: string) {
+  const rows: Array<[string, string, number]> = [
+    ["new_contacts", "leads", 18], ["messages_in", "customer", 146],
+    ["messages_out", "ai", 88], ["messages_out", "team", 31], ["messages_out", "phone_app", 12],
+    ["handoffs_raised", "handoff", 9], ["handoffs_resolved", "handoff", 7], ["handoff_response_median_minutes", "team_first_reply", 14.5],
+    ["payments_pending", "payments", 6], ["payments_verified", "payments", 12], ["payments_rejected", "payments", 2], ["sales_inr", "verified_payments", 98500],
+    ["campaign_sent", "campaigns", 32], ["campaign_delivered", "campaigns", 30], ["campaign_read", "campaigns", 22], ["campaign_replied", "campaigns", 5], ["campaign_paid", "campaigns", 2],
+    ["automation_sent", "automations", 11], ["automation_skipped", "automations", 3],
+  ];
+  return rows.map(([metric, dimension, value]) => ({ report_date: day, metric, dimension, value, period_total: value }));
 }

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireBusinessAccess } from "@/lib/api-auth";
+import { requireBusinessAccess, requirePermission } from "@/lib/api-auth";
 import { reactivateOwnerAlerts } from "@/lib/owner-alerts";
 
 const SETTINGS = "owner_alerts_enabled, owner_whatsapp_alerts_enabled, owner_whatsapp_number, owner_alert_realert_minutes, owner_alert_quiet_hours_start, owner_alert_quiet_hours_end, owner_alert_timezone";
@@ -35,8 +35,9 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
-  const { businessId, role, admin } = access;
-  if (role !== "admin") return Response.json({ error: "Only a business admin can change alert settings" }, { status: 403 });
+  const denied = requirePermission(access, "owner_alert_settings");
+  if (denied) return denied;
+  const { businessId, admin } = access;
 
   let body: Record<string, unknown>;
   try {

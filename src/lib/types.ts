@@ -25,6 +25,8 @@ export interface Business {
   coexistence_enabled?: boolean;
   media_ai_enabled?: boolean;
   dashboard_v2_enabled?: boolean;
+  modules_enabled?: Record<string, boolean>;
+  strict_roles?: boolean;
   created_at: string;
 }
 
@@ -33,6 +35,9 @@ export interface Profile {
   business_id: string;
   name: string | null;
   role: "admin" | "support" | "sales" | "accounts";
+  email?: string | null;
+  status?: "invited" | "active" | "disabled";
+  invited_at?: string | null;
   created_at: string;
 }
 
@@ -45,6 +50,7 @@ export interface Conversation {
   assigned_to: string | null;
   tags: string[];
   payment_status: "none" | "pending" | "verified" | "rejected";
+  payment_amount?: number | null;
   internal_note: string | null;
   updated_at: string;
   created_at: string;
@@ -70,7 +76,7 @@ export interface Message {
   whatsapp_msg_id: string | null;
   delivery_status?: "sent" | "delivered" | "read" | "failed" | null;
   delivery_error_code?: string | null;
-  source?: "customer" | "ai" | "dashboard" | "business_app" | "history" | null;
+  source?: "customer" | "ai" | "dashboard" | "business_app" | "history" | "automation" | "template" | null;
   transcript?: string | null;
   media_analysis?: Record<string, unknown> | null;
   created_at: string;

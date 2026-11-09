@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
-import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess, requireStrictPermission } from "@/lib/api-auth";
+import { recordContactActivity } from "@/lib/activity";
+import { cancelAutomationForConversation } from "@/lib/automation-queue";
 
 export async function PATCH(
   request: NextRequest,
@@ -38,6 +40,20 @@ export async function PATCH(
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
   const { businessId, admin } = access;
+  const replyDenied = requireStrictPermission(access, "conversation_reply");
+  if (replyDenied && Object.keys(update).some((field) => field !== "payment_status")) return replyDenied;
+  if ("payment_status" in update) {
+    const paymentDenied = requireStrictPermission(access, "payment_verify");
+    if (paymentDenied) return paymentDenied;
+  }
+  if ("assigned_to" in update) {
+    const assignee = update.assigned_to;
+    if (assignee !== null && (typeof assignee !== "string" || !/^[0-9a-f-]{36}$/i.test(assignee))) return Response.json({ error: "Choose an active team member" }, { status: 400 });
+    if (typeof assignee === "string") {
+      const { data: member } = await admin.from("profiles").select("id").eq("id", assignee).eq("business_id", businessId).eq("status", "active").maybeSingle();
+      if (!member) return Response.json({ error: "Choose an active team member from this business" }, { status: 400 });
+    }
+  }
 
   const { conversation, error: conversationError } = await getOwnedConversation(admin, businessId, id, "id");
   if (conversationError) {
@@ -57,6 +73,11 @@ export async function PATCH(
     return Response.json({ error: error.message }, { status: 500 });
   }
   if (!data) return conversationNotFound();
+
+  for (const [field, eventType] of [["mode", "mode_change"], ["internal_note", "note_updated"], ["tags", "tags_updated"]] as const) {
+    if (field in update) await recordContactActivity(admin, businessId, id, eventType, { value: update[field] });
+  }
+  if (update.mode === "human") await cancelAutomationForConversation(businessId, id, "A team member took over");
 
   return Response.json(data);
 }
