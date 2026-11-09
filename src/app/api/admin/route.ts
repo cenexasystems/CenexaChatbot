@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (q) query = query.or(`name.ilike.%${q}%,whatsapp_number.ilike.%${q}%`);
   if (filter === "disconnected") query = query.eq("is_active", false);
   if (filter === "suspended") query = query.eq("platform_suspended", true);
-  const callTenantSummary = access.admin.rpc as unknown as (name: string) => Promise<{ data: { business_id:string;last_customer_message_at:string|null;messages_30d:number;open_owner_alerts:number }[]|null; error: { message:string }|null }>;
+  const callTenantSummary = access.admin.rpc.bind(access.admin) as unknown as (name: string) => Promise<{ data: { business_id:string;last_customer_message_at:string|null;messages_30d:number;open_owner_alerts:number }[]|null; error: { message:string }|null }>;
   const [{ data: businesses, error }, { data: summaryRows, error: summaryError }] = await Promise.all([query, callTenantSummary("get_platform_tenant_summary")]);
   if (error || summaryError) return Response.json({ error: "Unable to load tenants" }, { status: 500 });
   const tenants = businesses ?? [];
@@ -56,7 +56,7 @@ export async function PATCH(request: Request) {
     if (!update.modules_enabled || typeof update.modules_enabled !== "object" || Array.isArray(update.modules_enabled)) return Response.json({ error: "Invalid module flags" }, { status: 400 });
     if (!Object.keys(update.modules_enabled as object).every((key) => ["templates","contacts","campaigns","automations","reports","team","integrations"].includes(key))) return Response.json({ error: "Unsupported module key" }, { status: 400 });
   }
-  const callPlatformUpdate = access.admin.rpc as unknown as (name: string, args: Record<string, unknown>) => Promise<{ data: Record<string, unknown> | null; error: { code: string; message: string } | null }>;
+  const callPlatformUpdate = access.admin.rpc.bind(access.admin) as unknown as (name: string, args: Record<string, unknown>) => Promise<{ data: Record<string, unknown> | null; error: { code: string; message: string } | null }>;
   const { data: tenant, error } = await callPlatformUpdate("platform_update_tenant", { p_tenant_id: tenantId, p_updates: update, p_actor_id: access.userId, p_reason: reason });
   if (error) return Response.json({ error: error.code === "P0002" ? "Tenant not found" : "Unable to update tenant" }, { status: error.code === "P0002" ? 404 : 500 });
   if (!tenant) return Response.json({ error: "Tenant not found" }, { status: 404 });
