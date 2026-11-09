@@ -17,11 +17,12 @@ export async function GET(request: Request) {
   const tenants = businesses ?? [];
   const summaries = new Map((summaryRows ?? []).map((row) => [row.business_id, row]));
   const enriched = tenants.map((business) => { const summary=summaries.get(business.id); return { ...business, last_customer_message_at:summary?.last_customer_message_at??null,messages_30d:summary?.messages_30d??0,open_owner_alerts:summary?.open_owner_alerts??0 }; });
+  let visibleTenants = enriched;
   if (filter === "no_recent_traffic") {
     const cutoff = Date.now() - 30 * 86400000;
-    return Response.json({ tenants: enriched.filter((row) => !row.last_customer_message_at || Date.parse(row.last_customer_message_at) < cutoff), role: access.role });
+    visibleTenants = enriched.filter((row) => !row.last_customer_message_at || Date.parse(row.last_customer_message_at) < cutoff);
   }
-  const byPlan = enriched.reduce<Record<string, number>>((counts, row) => { counts[row.plan] = (counts[row.plan] ?? 0) + 1; return counts; }, {});
+  const byPlan = visibleTenants.reduce<Record<string, number>>((counts, row) => { counts[row.plan] = (counts[row.plan] ?? 0) + 1; return counts; }, {});
   const [{ data: sending }, { data: pendingTemplates }, { data: cron }, { data: recentAudit }] = await Promise.all([
     access.admin.from("campaigns").select("id", { count: "exact", head: true }).eq("status", "sending"),
     access.admin.from("message_templates").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
     access.admin.from("platform_audit_log").select("id,actor_id,tenant_id,action,reason,created_at").order("created_at", { ascending: false }).limit(50),
   ]);
   const { data: usage } = await access.admin.from("tenant_usage_daily").select("usage_date,inbound_messages,ai_calls,ai_replies,team_replies,media_ai_analyses,template_sends,campaign_sends").order("usage_date", { ascending: false }).limit(5000);
-  return Response.json({ tenants: enriched, role: access.role, summary: { tenantCount: enriched.length, activeCount: enriched.filter((row) => !row.platform_suspended).length, byPlan, sendingCampaigns: sending?.length ?? 0, pendingTemplates: pendingTemplates?.length ?? 0, messagesByDay: aggregateUsage(usage ?? []) }, cron: cron ?? [], recentAudit: recentAudit ?? [] });
+  return Response.json({ tenants: visibleTenants, role: access.role, summary: { tenantCount: visibleTenants.length, activeCount: visibleTenants.filter((row) => !row.platform_suspended).length, byPlan, sendingCampaigns: sending?.length ?? 0, pendingTemplates: pendingTemplates?.length ?? 0, messagesByDay: aggregateUsage(usage ?? []) }, cron: cron ?? [], recentAudit: recentAudit ?? [] });
 }
 
 export async function PATCH(request: Request) {

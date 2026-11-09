@@ -8,12 +8,35 @@ type Overview = { role: "owner" | "support" | "read_only"; tenants: Tenant[]; su
 
 export function PlatformOverview() {
   const [data, setData] = useState<Overview | null>(null); const [error, setError] = useState(""); const [mfaRequired, setMfaRequired] = useState(false); const [q, setQ] = useState(""); const [filter, setFilter] = useState("all"); const [busy, setBusy] = useState(true);
-  const load = useCallback(async () => { const response = await fetch(`/api/admin?${new URLSearchParams({ ...(q ? { q } : {}), ...(filter !== "all" ? { filter } : {}) })}`, { cache: "no-store" }); const body = await response.json(); if (!response.ok) { setError(body.error ?? "Platform access is unavailable"); setMfaRequired(body.code === "MFA_REQUIRED"); } else { setError(""); setMfaRequired(false); setData(body); } setBusy(false); }, [q, filter]);
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/admin?${new URLSearchParams({ ...(q ? { q } : {}), ...(filter !== "all" ? { filter } : {}) })}`, { cache: "no-store", signal: AbortSignal.timeout(15000) });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(typeof body?.error === "string" ? body.error : `Platform access is unavailable (${response.status})`);
+        setMfaRequired(body?.code === "MFA_REQUIRED");
+      } else if (!body || !Array.isArray(body.tenants) || !body.summary || !Array.isArray(body.cron) || !Array.isArray(body.recentAudit)) {
+        setError("The platform overview returned an unexpected response. Try again or check the server logs.");
+        setMfaRequired(false);
+      } else {
+        setError("");
+        setMfaRequired(false);
+        setData(body);
+      }
+    } catch {
+      setError("Could not load the platform overview. Check your connection and try again.");
+      setMfaRequired(false);
+    } finally {
+      setBusy(false);
+    }
+  }, [q, filter]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- load updates state only after the asynchronous fetch settles.
   useEffect(() => { void load(); }, [load]);
   return <main className="min-h-dvh bg-[#f6f7f9] p-4 sm:p-8 text-slate-900"><div className="mx-auto max-w-7xl space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-blue-700">Cenexa · platform</p><h1 className="mt-1 text-3xl font-bold">Tenant operations</h1><p className="mt-1 text-sm text-slate-600">Metadata and counts only. Customer conversation content is not shown.</p></div>{data && <span className="flex items-center gap-3 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase">{data.role.replace("_", " ")} · MFA verified{data.role==="owner"&&<Link href="/admin/platform-admins" className="underline">Manage admins</Link>}</span>}</header>
-    {error && <section role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}{mfaRequired&&<Link className="ml-2 font-bold underline" href="/admin/mfa">Set up or verify MFA</Link>}</section>}
+    {busy && !data && <section role="status" aria-live="polite" className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">Loading platform overview…</section>}
+    {error && <section role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}{mfaRequired&&<Link className="ml-2 font-bold underline" href="/admin/mfa">Set up or verify MFA</Link>}{!mfaRequired&&<button className="ml-3 font-bold underline" onClick={()=>void load()}>Try again</button>}</section>}
     {data && <>
       <section className="grid grid-cols-2 gap-3 md:grid-cols-5">{[["Tenants",data.summary.tenantCount],["Active",data.summary.activeCount],["Sending campaigns",data.summary.sendingCampaigns],["Templates pending",data.summary.pendingTemplates],["Plans",Object.entries(data.summary.byPlan).map(([k,v])=>`${k} ${v}`).join(" · ")||"—"]].map(([label,value])=><article key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{label}</p><strong className="mt-1 block text-xl">{value}</strong></article>)}</section>
       <section className="grid gap-5 lg:grid-cols-[1fr_320px]">
