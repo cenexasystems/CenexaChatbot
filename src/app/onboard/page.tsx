@@ -73,6 +73,7 @@ export default function OnboardPage() {
 
   const [step, setStep] = useState<Step>("details");
   const [businessName, setBusinessName] = useState("");
+  const [registrationPin, setRegistrationPin] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [sdkReady, setSdkReady] = useState(false);
   const [successData, setSuccessData] = useState<{
@@ -165,7 +166,7 @@ export default function OnboardPage() {
             const res = await fetch("/api/onboard/callback", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ code, businessName }),
+              body: JSON.stringify({ code, businessName, registrationPin: registrationPin || undefined }),
             });
 
             const data = await res.json();
@@ -198,7 +199,7 @@ export default function OnboardPage() {
         },
       }
     );
-  }, [sdkReady, businessName]);
+  }, [sdkReady, businessName, registrationPin]);
 
   /* ── Render ────────────────────────────────────────────────────────────── */
   return (
@@ -303,6 +304,25 @@ export default function OnboardPage() {
                   className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none transition-all text-sm"
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-2">
+                  WhatsApp two-step PIN <span className="normal-case">(API numbers only)</span>
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={registrationPin}
+                  onChange={(e) => setRegistrationPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Leave blank for WhatsApp Business app numbers"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none transition-all text-sm"
+                />
+                <p className="text-xs text-white/40 mt-2">
+                  This is the number owner&apos;s existing six-digit WhatsApp verification PIN. It is sent to Meta only during setup and is not saved.
+                </p>
               </div>
 
               <button

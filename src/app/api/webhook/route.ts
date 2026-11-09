@@ -23,7 +23,12 @@ type MediaType = (typeof MEDIA_TYPES)[number];
 
 export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
-  if (p.get("hub.mode") === "subscribe" && p.get("hub.verify_token") === process.env.WHATSAPP_VERIFY_TOKEN) {
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  if (!verifyToken) {
+    console.error("[webhook] WHATSAPP_VERIFY_TOKEN is not configured");
+    return new Response("Webhook verification is not configured", { status: 503 });
+  }
+  if (p.get("hub.mode") === "subscribe" && p.get("hub.verify_token") === verifyToken) {
     return new Response(p.get("hub.challenge"), { status: 200 });
   }
   return new Response("Forbidden", { status: 403 });
@@ -32,7 +37,7 @@ export async function GET(request: NextRequest) {
 /* ───────────────────────── Signature Verification ───────────────────────── */
 
 function verifySignature(raw: string, header: string | null): boolean {
-  const mode = (process.env.META_APP_SIGNATURE_MODE ?? "off").toLowerCase();
+  const mode = (process.env.META_APP_SIGNATURE_MODE ?? (process.env.NODE_ENV === "production" ? "enforce" : "off")).toLowerCase();
   if (mode === "off") {
     return true;
   }

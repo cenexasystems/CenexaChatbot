@@ -23,9 +23,9 @@
 
 | `META_APP_SIGNATURE_MODE` | Behaviour |
 |---|---|
-| `off` (default) | No verification. Safe until META_APP_SECRET is confirmed working. |
+| `enforce` (production default) | Reject requests with invalid signatures (HTTP 401). Requires `META_APP_SECRET`. |
 | `log` | Compute and log mismatches but still process every request. |
-| `enforce` | Reject requests with invalid signatures (HTTP 401). Use only after 48h of `log` with zero mismatches. |
+| `off` | No signature check. Local development only. |
 
 ---
 
@@ -105,12 +105,13 @@ After rotating, update the values in:
 - [ ] Paste and run `supabase/migrations/<date>_coexistence_and_media_ai.sql`.
 - [ ] Confirm: no errors, all `ALTER TABLE` rows returned `ALTER TABLE`.
 - [ ] **Verify live app is unaffected:** send a test WhatsApp message from a team phone to each live client's number; confirm normal AI replies come back.
+- [ ] Apply all other unapplied files in `supabase/migrations/` in date order. This includes `20261109_tenant_realtime_rls.sql` before onboarding outside businesses.
 
 ### Code deployment
 
 - [ ] Deploy the `feat/coexistence-media-ai` branch to production (Vercel or your host).
-- [ ] Set env vars: `META_APP_SIGNATURE_MODE=off` (will change later), all new keys from `.env.example` added with empty/default values.
-- [ ] **Verify both live clients are unaffected** (their `media_ai_enabled` and `coexistence_enabled` are `false`): send harmless test messages from a team phone; replies must be byte-for-byte identical to before.
+- [ ] Configure production values from `.env.example`. Keep `META_APP_SIGNATURE_MODE=enforce`; do not use a shared WhatsApp registration PIN.
+- [ ] **Verify existing clients are unaffected** (their `media_ai_enabled` and `coexistence_enabled` are `false`): send a harmless test message and confirm the reply.
 
 ### Signature verification
 
