@@ -17,6 +17,7 @@ export function TeamManager() {
   const [strictRoles, setStrictRoles] = useState(false);
   const [email, setEmail] = useState(""); const [name, setName] = useState(""); const [newRole, setNewRole] = useState<TeamRole>("support");
   const [loading, setLoading] = useState(!demo); const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState<string | null>(null);
   const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   const reload = useCallback(async () => {
     const response = await fetch("/api/team"); const data = await response.json().catch(() => ({}));
@@ -34,6 +35,17 @@ export function TeamManager() {
     try { const response = await fetch(`/api/team/${member.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error ?? "Team update failed"); if (data.warning) setNotice(data.warning); else setNotice("Team member updated."); if (member.id === userId) window.location.reload(); await reload(); }
     catch (e) { setError((e as Error).message); }
   }
+  async function resendInvite(member: Member) {
+    setResending(member.id); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/team/${member.id}`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Could not resend invitation");
+      setNotice(data.warning ?? `A new invitation email was sent to ${member.email}.`);
+      await reload();
+    } catch (e) { setError((e as Error).message); }
+    finally { setResending(null); }
+  }
   async function toggleStrict() {
     const response = await fetch("/api/team", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ strictRoles: !strictRoles }) }); const data = await response.json().catch(() => ({}));
     if (!response.ok) setError(data.error ?? "Could not update role enforcement"); else { setStrictRoles(data.strictRoles); updateBusiness({ strict_roles: data.strictRoles }); setNotice(`Strict role enforcement ${data.strictRoles ? "enabled" : "disabled"}.`); }
@@ -45,7 +57,7 @@ export function TeamManager() {
       {!admin && <p className="rounded-lg bg-canvas p-3 text-[12px] text-ink-soft">Only business admins can invite staff or change roles.</p>}
       <Panel title="Role enforcement" icon="team"><div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="text-[13px] font-semibold">Strict roles are {strictRoles ? "on" : "off"}</p><p className="text-[11px] text-ink-faint">When enabled, permissions follow each member’s role across inbox, payments, and settings.</p></div>{admin && <Button variant={strictRoles ? "danger" : "primary"} onClick={toggleStrict} disabled={demo}>{strictRoles ? "Turn off strict roles" : "Enable strict roles"}</Button>}</div></Panel>
       {admin && <Panel title="Invite a teammate" icon="team"><form onSubmit={invite} className="grid gap-3 p-4 sm:grid-cols-2"><label className="text-[11px]">Full name<input className={`${field} mt-1`} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required /></label><label className="text-[11px]">Email<input className={`${field} mt-1`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} required /></label><label className="text-[11px]">Role<select className={`${field} mt-1`} value={newRole} onChange={(e) => setNewRole(e.target.value as TeamRole)}>{ROLES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><div className="flex items-end justify-end"><Button type="submit" disabled={saving || demo}>{saving ? "Sending invite…" : "Send invitation"}</Button></div></form></Panel>}
-      <Panel title="Business members" icon="team">{members.length ? <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-[12px]"><thead className="text-[10px] text-ink-faint"><tr><th className="p-3">Member</th><th className="p-3">Role</th><th className="p-3">Status</th><th className="p-3">Access</th></tr></thead><tbody className="divide-y divide-line">{members.map((member) => <tr key={member.id}><td className="p-3"><p className="font-semibold">{member.name || "Team member"}</p><p className="text-ink-faint">{member.email || "Email unavailable"}</p></td><td className="p-3">{admin ? <select disabled={demo} className={field} value={member.role} onChange={(e) => void changeMember(member, { role: e.target.value as TeamRole })}>{ROLES.map((item) => <option key={item} value={item}>{item}</option>)}</select> : member.role}</td><td className="p-3 capitalize">{member.status}</td><td className="p-3">{admin && <Button size="sm" variant={member.status === "disabled" ? "primary" : "danger"} disabled={demo} onClick={() => void changeMember(member, { status: member.status === "disabled" ? "active" : "disabled" })}>{member.status === "disabled" ? "Reactivate" : "Deactivate"}</Button>}</td></tr>)}</tbody></table></div> : <EmptyState icon="team" title="No team members" body="Invited staff appear here after the invitation is created." />}</Panel>
+      <Panel title="Business members" icon="team">{members.length ? <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-[12px]"><thead className="text-[10px] text-ink-faint"><tr><th className="p-3">Member</th><th className="p-3">Role</th><th className="p-3">Status</th><th className="p-3">Access</th></tr></thead><tbody className="divide-y divide-line">{members.map((member) => <tr key={member.id}><td className="p-3"><p className="font-semibold">{member.name || "Team member"}</p><p className="text-ink-faint">{member.email || "Email unavailable"}</p></td><td className="p-3">{admin ? <select disabled={demo} className={field} value={member.role} onChange={(e) => void changeMember(member, { role: e.target.value as TeamRole })}>{ROLES.map((item) => <option key={item} value={item}>{item}</option>)}</select> : member.role}</td><td className="p-3 capitalize">{member.status}</td><td className="p-3"><div className="flex flex-wrap gap-2">{admin && member.status === "invited" && <Button size="sm" variant="secondary" disabled={demo || resending !== null} onClick={() => void resendInvite(member)}>{resending === member.id ? "Sending…" : "Resend invite"}</Button>}{admin && <Button size="sm" variant={member.status === "disabled" ? "primary" : "danger"} disabled={demo || resending !== null} onClick={() => void changeMember(member, { status: member.status === "disabled" ? "active" : "disabled" })}>{member.status === "disabled" ? "Reactivate" : "Deactivate"}</Button>}</div></td></tr>)}</tbody></table></div> : <EmptyState icon="team" title="No team members" body="Invited staff appear here after the invitation is created." />}</Panel>
     </div>}
   </Page>;
 }
