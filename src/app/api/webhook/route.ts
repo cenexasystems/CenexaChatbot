@@ -14,6 +14,7 @@ import { cancelAutomationForConversation, enqueueAutomationForConversation } fro
 import { isPersonHandoffRequest } from "@/lib/handoff";
 import { appendHandoffRules, isConfiguredGreeting, rewriteConfiguredUrls } from "@/lib/assistant-config";
 import { parseClickToChatSource } from "@/lib/integrations";
+import { getRelevantKnowledgeContext } from "@/lib/knowledge";
 
 // Voice/vision + AI reply can take several seconds. We ack Meta immediately and
 // keep working via after(); this raises the ceiling for that background work.
@@ -483,6 +484,8 @@ async function handleIncoming(value: any, message: any) {
     }
 
     // Call AI with legacy global instructions
+    const knowledgeQuery = history.filter((m: any) => m.role === "user").slice(-2).map((m: any) => `${m.content} ${m.transcript ?? ""} ${JSON.stringify(m.media_analysis ?? "")}`).join(" ");
+    const knowledge = businessId ? await getRelevantKnowledgeContext(supabase, businessId, knowledgeQuery) : "";
     const aiResult = await getAIResponse(
       history.map((m: any) => {
         let aiContent = m.content;
@@ -496,7 +499,7 @@ async function handleIncoming(value: any, message: any) {
           content: aiContent,
         };
       }),
-      systemPrompt ?? undefined,
+      `${systemPrompt ?? ""}${knowledge}`,
       biz?.openrouter_api_key ?? undefined,
       biz?.ai_model ?? undefined,
       false // mediaAiEnabled = false -> LEGACY_GLOBAL_INSTRUCTIONS
@@ -622,6 +625,8 @@ async function handleIncoming(value: any, message: any) {
   }
 
   /* ── AI reply ── */
+  const knowledgeQuery = history.filter((m: any) => m.role === "user").slice(-2).map((m: any) => `${m.content} ${m.transcript ?? ""} ${JSON.stringify(m.media_analysis ?? "")}`).join(" ");
+  const knowledge = businessId ? await getRelevantKnowledgeContext(supabase, businessId, knowledgeQuery) : "";
   const aiResult = await getAIResponse(
     history.map((m: any) => {
       let content = describeMediaForAI(m) ?? m.content;
@@ -632,7 +637,7 @@ async function handleIncoming(value: any, message: any) {
       }
       return { role: m.role as "user" | "assistant", content };
     }),
-    systemPrompt ?? undefined,
+    `${systemPrompt ?? ""}${knowledge}`,
     biz?.openrouter_api_key ?? undefined,
     biz?.ai_model ?? undefined,
     true // mediaAiEnabled = true -> MEDIA_GLOBAL_INSTRUCTIONS

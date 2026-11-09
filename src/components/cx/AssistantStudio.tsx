@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button, Panel, cx } from "@/components/cx/ui";
 import { Icon } from "@/components/cx/icons";
 
@@ -15,6 +15,7 @@ type AssistantSettings = {
 };
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type KnowledgeFile = { id: string; file_name: string; mime_type: string; size_bytes: number; chunk_count: number; created_at: string };
 
 const EMPTY_SETTINGS: AssistantSettings = {
   system_prompt: "",
@@ -49,6 +50,22 @@ export function AssistantStudio() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [testError, setTestError] = useState("");
+  const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(true);
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
+  const [knowledgeError, setKnowledgeError] = useState("");
+
+  const loadKnowledgeFiles = useCallback(async () => {
+    try {
+      const response = await fetch("/api/assistant/knowledge", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load knowledge files.");
+      setKnowledgeFiles(data.files ?? []);
+      setKnowledgeError("");
+    } catch (err) {
+      setKnowledgeError(err instanceof Error ? err.message : "Could not load knowledge files.");
+    } finally { setKnowledgeLoading(false); }
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -69,6 +86,39 @@ export function AssistantStudio() {
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadKnowledgeFiles(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadKnowledgeFiles]);
+
+  async function uploadKnowledgeFile(file?: File) {
+    if (!file) return;
+    setKnowledgeBusy(true); setKnowledgeError("");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/assistant/knowledge", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not add knowledge file.");
+      setKnowledgeFiles((current) => [data.file, ...current]);
+    } catch (err) {
+      setKnowledgeError(err instanceof Error ? err.message : "Could not add knowledge file.");
+    } finally { setKnowledgeBusy(false); }
+  }
+
+  async function deleteKnowledgeFile(file: KnowledgeFile) {
+    if (!window.confirm(`Remove ${file.file_name} from the assistant's knowledge?`)) return;
+    setKnowledgeBusy(true); setKnowledgeError("");
+    try {
+      const response = await fetch(`/api/assistant/knowledge/${file.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not remove knowledge file.");
+      setKnowledgeFiles((current) => current.filter((item) => item.id !== file.id));
+    } catch (err) {
+      setKnowledgeError(err instanceof Error ? err.message : "Could not remove knowledge file.");
+    } finally { setKnowledgeBusy(false); }
+  }
 
   function update<K extends keyof AssistantSettings>(key: K, value: AssistantSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -225,10 +275,11 @@ export function AssistantStudio() {
         </Panel>
       </form>
 
-      <Panel title="Knowledge files" icon="file" meta={<span className="eyebrow !text-[9px]">Coming later</span>}>
-        <div className="p-4 flex items-start gap-3">
-          <Icon name="upload" size={18} className="text-ink-faint mt-0.5" />
-          <div><p className="text-[13px] font-semibold">Add a price list or brochure</p><p className="text-[12px] text-ink-faint mt-1">File search is not connected yet. The test chat currently uses the saved instructions above.</p></div>
+      <Panel title="Knowledge files" icon="file" meta={<span className="eyebrow !text-[9px]">{knowledgeFiles.length} / 25 files</span>} action={<label className="inline-flex cursor-pointer items-center"><input type="file" accept=".txt,.md,.csv,.json,.pdf,text/plain,text/markdown,text/csv,application/json,application/pdf" className="sr-only" disabled={knowledgeBusy || knowledgeFiles.length >= 25} onChange={(event) => { void uploadKnowledgeFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className="inline-flex h-9 items-center rounded-[9px] bg-brand px-3 text-[12px] font-semibold text-white">{knowledgeBusy ? "Working…" : "Add file"}</span></label>}>
+        <div className="p-4 space-y-3">
+          <p className="text-[12px] text-ink-soft">Upload a price list, service menu, FAQ, or brochure as UTF-8 text, Markdown, CSV, or JSON. Relevant excerpts are searched and used in live replies and the saved-settings test chat. Files are private to this business. Limit: 1 MB per file and 25 files.</p>
+          {knowledgeError && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-tint px-3 py-2 text-[12px] text-danger">{knowledgeError}</p>}
+          {knowledgeLoading ? <p className="text-[12px] text-ink-faint">Loading files…</p> : knowledgeFiles.length ? <ul className="divide-y divide-line rounded-xl border border-line">{knowledgeFiles.map((file) => <li key={file.id} className="flex items-center gap-3 px-3 py-2.5"><Icon name="file" size={16} className="text-accent"/><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{file.file_name}</span><span className="text-[10px] text-ink-faint">{(file.size_bytes / 1024).toFixed(1)} KB · {file.chunk_count} searchable sections · {new Date(file.created_at).toLocaleDateString()}</span></span><button type="button" disabled={knowledgeBusy} onClick={() => void deleteKnowledgeFile(file)} className="rounded-md px-2 py-1 text-[11px] font-semibold text-danger hover:bg-danger-tint disabled:opacity-50">Remove</button></li>)}</ul> : <p className="rounded-lg bg-canvas p-3 text-[12px] text-ink-faint">No knowledge files yet. Add one to teach the assistant your prices and services.</p>}
         </div>
       </Panel>
 

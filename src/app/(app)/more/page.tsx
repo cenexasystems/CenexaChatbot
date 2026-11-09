@@ -9,6 +9,7 @@ import { isMoneyToConfirm } from "@/lib/inbox";
 import { OwnerAlertSettings } from "@/components/cx/OwnerAlertSettings";
 import { WhatsAppConnection } from "@/components/cx/WhatsAppConnection";
 import { PwaInstallCard } from "@/components/cx/PwaInstallCard";
+import { ChangePassword } from "@/components/cx/ChangePassword";
 
 type Item = { icon: IconName; label: string; hint: string; href?: string; count?: number; state?: "Later" };
 
@@ -99,6 +100,8 @@ export default function MorePage() {
             )}
           </ul>
         </Panel>
+
+        {!demo && <ChangePassword />}
       </div>
     </Page>
   );
