@@ -4,10 +4,30 @@ import { useState } from "react";
 import Image from "next/image";
 import { login, signup } from "./actions";
 
+function LockIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]" stroke="currentColor" strokeWidth="1.8">
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EyeIcon({ crossed = false }: { crossed?: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]" stroke="currentColor" strokeWidth="1.7">
+      <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.6" />
+      {crossed && <path d="m4 4 16 16" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setIsPending(true);
@@ -17,69 +37,118 @@ export default function LoginPage() {
       if (result?.error) setError(result.error);
     } catch (err) {
       if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) throw err;
-      setError("We could not sign you in. Please try again.");
+      setError("We could not sign you in. Please check your details and try again.");
     } finally {
       setIsPending(false);
     }
   }
 
+  const isLogin = mode === "login";
+
   return (
-    <main className="min-h-screen bg-[#EFF7FC] px-4 py-8 sm:px-8 flex items-center justify-center">
-      <div className="w-full max-w-5xl min-h-[620px] overflow-hidden rounded-[28px] border border-[#B9E2F5] bg-white shadow-[0_24px_80px_rgba(15,75,120,0.14)] grid md:grid-cols-2">
-        <section className="relative flex flex-col justify-between overflow-hidden bg-[#0B4B70] p-8 text-white sm:p-12">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#13A6D5]/20 blur-3xl" />
-          <div className="relative flex items-center gap-4">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-2 shadow-lg">
-              <Image src="/brand/cenexa-mark.png" alt="Cenexa" width={44} height={44} className="h-full w-full object-contain" priority />
-            </span>
-            <span>
-              <span className="block font-[var(--font-michroma)] text-lg tracking-[0.08em]">CENEXA</span>
-              <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.34em] text-[#69D5F2]">ChatFlow</span>
-            </span>
+    <main className="flex min-h-screen items-center justify-center bg-[#EFF7FC] px-5 py-10 text-[#17263B]">
+      <div className="w-full max-w-[420px]">
+        <section className="relative overflow-hidden rounded-[24px] border border-[#B9E2F5] bg-white px-7 pb-7 pt-8 shadow-[0_24px_70px_rgba(15,75,120,0.14)] sm:px-9 sm:pb-8 sm:pt-9">
+          <div className="absolute inset-x-0 top-0 h-[5px] bg-gradient-to-r from-[#0B3B8C] via-[#078BCB] to-[#19B4EC]" />
+
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[19px] border border-[#C9E5F6] bg-[#F2F9FD] p-3 shadow-[0_8px_24px_rgba(15,75,120,0.14)]">
+              <Image src="/brand/cenexa-mark.png" alt="Cenexa" width={52} height={52} className="h-full w-full object-contain" priority />
+            </div>
+            <p className="mt-4 font-[var(--font-wordmark)] text-[23px] leading-none tracking-[0.03em] text-[#0A1F44]">CENEXA</p>
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.32em] text-[#078BCB]">CHATFLOW</p>
           </div>
-          <div className="relative my-12">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#73D8F2]">WhatsApp workspace</p>
-            <h1 className="mt-5 max-w-md text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-              Your customer conversations, all in one place.
+
+          <div className="mt-8 text-center">
+            <h1 className="text-[21px] font-extrabold tracking-[0.01em] text-[#17263B]">
+              {isLogin ? "Welcome back" : "Create your account"}
             </h1>
-            <p className="mt-6 max-w-md text-base leading-7 text-white/80">
-              Reply to customers, manage your inbox, and set up your AI assistant from one simple dashboard.
+              <p className="mt-2 text-sm leading-6 text-[#53627A]">
+              {isLogin ? "Sign in to manage your WhatsApp workspace." : "Create an account to set up your WhatsApp workspace."}
             </p>
           </div>
-          <div className="relative flex items-center gap-2 text-sm font-semibold text-white/80">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg>
-            Secure business workspace
+
+          <form action={handleSubmit} className="mt-7 space-y-4">
+            <div>
+              <label htmlFor="email" className="mb-2 block pl-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#39485F]">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="you@business.com"
+                className="h-[50px] w-full rounded-[13px] border border-[#B9DDF2] bg-[#F2F9FD] px-4 text-sm font-medium text-[#17263B] placeholder:text-[#7B8CA3] outline-none transition focus:border-[#078BCB] focus:ring-2 focus:ring-[#078BCB]/15"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="mb-2 block pl-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#39485F]">
+                Password
+              </label>
+              <div className="flex h-[50px] items-center rounded-[13px] border border-[#B9DDF2] bg-[#F2F9FD] px-3.5 transition focus-within:border-[#078BCB] focus-within:ring-2 focus-within:ring-[#078BCB]/15">
+                <span className="mr-3 text-[#0B5BD3]"><LockIcon /></span>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  required
+                  minLength={6}
+                  placeholder="Enter your password"
+                  className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#17263B] placeholder:text-[#7B8CA3] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((shown) => !shown)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="ml-2 flex h-8 w-8 items-center justify-center rounded-md text-[#71839A] transition hover:bg-[#E5F2FA] hover:text-[#0B3B8C]"
+                >
+                  <EyeIcon crossed={showPassword} />
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <p role="alert" className="rounded-xl border border-[#efc9c9] bg-[#fff5f5] px-4 py-3 text-sm font-medium text-[#a32929]">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isPending}
+              className="mt-2 flex h-[50px] w-full items-center justify-center gap-2 rounded-[13px] bg-gradient-to-r from-[#0B3B8C] via-[#087DBB] to-[#078BCB] text-xs font-extrabold uppercase tracking-[0.16em] text-white shadow-[0_10px_18px_rgba(7,91,164,0.24)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#078BCB]/25 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isPending ? "Please wait…" : isLogin ? "Authenticate" : "Create account"}
+              {!isPending && isLogin && <span aria-hidden="true" className="text-base leading-none">›</span>}
+            </button>
+          </form>
+
+          <div className="mt-5 flex justify-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#C9D9E9] bg-[#F2F7FC] px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#39485F]">
+              <span className="h-2 w-2 rounded-full bg-[#078BCB]" />
+              Secure business sign-in
+            </span>
           </div>
+
+          <p className="mt-5 text-center text-xs text-[#53627A]">
+            {isLogin ? "New to Cenexa? " : "Already have an account? "}
+            <button
+              type="button"
+              onClick={() => { setMode(isLogin ? "signup" : "login"); setError(null); }}
+              className="font-bold text-[#075D91] underline decoration-[#89B9D8] underline-offset-2 hover:text-[#0B3B8C] hover:decoration-[#0B3B8C]"
+            >
+              {isLogin ? "Create an account" : "Sign in"}
+            </button>
+          </p>
         </section>
 
-        <section className="flex items-center justify-center p-6 sm:p-12">
-          <div className="w-full max-w-md">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#087DBB]">{mode === "login" ? "Welcome back" : "Get started"}</p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#17263B]">{mode === "login" ? "Sign in to Cenexa" : "Create your account"}</h2>
-            <p className="mt-2 text-sm leading-6 text-[#64748B]">{mode === "login" ? "Manage your WhatsApp conversations and assistant." : "Set up your workspace and connect WhatsApp."}</p>
-
-            <form action={handleSubmit} className="mt-9 space-y-5">
-              <div>
-                <label htmlFor="email" className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#475569]">Email address</label>
-                <input id="email" name="email" type="email" autoComplete="email" required placeholder="you@business.com" className="h-13 w-full rounded-xl border border-[#B9DDF2] bg-[#F2F9FD] px-4 text-sm text-[#17263B] placeholder:text-[#94A3B8] focus:border-[#078BCB] focus:outline-none focus:ring-4 focus:ring-[#078BCB]/10" />
-              </div>
-              <div>
-                <label htmlFor="password" className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#475569]">Password</label>
-                <input id="password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={6} placeholder="Enter your password" className="h-13 w-full rounded-xl border border-[#B9DDF2] bg-[#F2F9FD] px-4 text-sm text-[#17263B] placeholder:text-[#94A3B8] focus:border-[#078BCB] focus:outline-none focus:ring-4 focus:ring-[#078BCB]/10" />
-              </div>
-              {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-              <button type="submit" disabled={isPending} className="mt-3 h-13 w-full rounded-xl bg-[#078BCB] font-bold text-white shadow-[0_8px_18px_rgba(7,139,203,0.2)] transition hover:bg-[#0876AE] disabled:cursor-not-allowed disabled:opacity-60">
-                {isPending ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-              </button>
-            </form>
-            <p className="mt-7 text-center text-sm text-[#64748B]">
-              {mode === "login" ? "New to Cenexa? " : "Already have an account? "}
-              <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }} className="font-bold text-[#087DBB] hover:text-[#075D91]">
-                {mode === "login" ? "Create an account" : "Sign in"}
-              </button>
-            </p>
-          </div>
-        </section>
+        <p className="mt-5 text-center text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#71839A]">
+          Cenexa ChatFlow · Business workspace
+        </p>
       </div>
     </main>
   );
