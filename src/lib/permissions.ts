@@ -1,4 +1,4 @@
-export type PermissionAction = "assistant_settings" | "assistant_test" | "owner_alert_settings" | "templates_manage" | "templates_send" | "contacts_manage" | "campaign_manage" | "automation_manage" | "reports_view" | "team_manage" | "conversation_reply" | "payment_verify";
+export type PermissionAction = "assistant_settings" | "assistant_test" | "owner_alert_settings" | "templates_manage" | "templates_send" | "contacts_manage" | "conversation_export" | "campaign_manage" | "automation_manage" | "reports_view" | "team_manage" | "conversation_reply" | "payment_verify";
 
 const ROLE_PERMISSIONS: Record<PermissionAction, readonly string[]> = {
   // Keep the Phase 0 matrix identical to the checks that already existed.
@@ -8,6 +8,7 @@ const ROLE_PERMISSIONS: Record<PermissionAction, readonly string[]> = {
   templates_manage: ["admin", "sales"],
   templates_send: ["admin", "support", "sales", "accounts"],
   contacts_manage: ["admin", "sales"],
+  conversation_export: ["admin"],
   campaign_manage: ["admin"],
   automation_manage: ["admin"],
   reports_view: ["admin", "accounts"],

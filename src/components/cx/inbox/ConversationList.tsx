@@ -33,7 +33,7 @@ const EMPTY: Record<InboxFilter, { title: string; body: string }> = {
 };
 
 export function ConversationList({ selectedId }: { selectedId: string | null }) {
-  const { conversations, now, t, userId } = useDashboard();
+  const { conversations, now, t, userId, role } = useDashboard();
   const router = useRouter();
   const params = useSearchParams();
   const filter = parseFilter(params.get("filter"));
@@ -62,13 +62,17 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
   }, [conversations, filter, query, now, mine, userId]);
 
   const qs = `${filter === "all" ? "" : `?filter=${filter}`}${mine ? `${filter === "all" ? "?" : "&"}mine=1` : ""}`;
+  const exportParams = new URLSearchParams({ format: "csv" });
+  if (filter !== "all") exportParams.set("filter", filter);
+  if (mine) exportParams.set("mine", "1");
+  if (query.trim()) exportParams.set("q", query.trim());
 
   return (
     <div className="h-full flex flex-col bg-surface">
       <div className="shrink-0 px-4 pt-4 pb-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-2">
           <h1 className="heading text-[20px] leading-tight">{t("nav.inbox")}</h1>
-          <span className="eyebrow tabular">{conversations.length} chats</span>
+          <div className="flex items-center gap-2"><span className="eyebrow tabular">{conversations.length} chats</span>{role === "admin" && <a href={`/api/conversations?${exportParams}`} className="rounded-md border border-line-strong px-2 py-1 text-[10px] font-semibold hover:bg-canvas">Export CSV</a>}</div>
         </div>
         <label className="mt-3 flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15 transition">
           <Icon name="search" size={16} className="text-ink-faint shrink-0" />

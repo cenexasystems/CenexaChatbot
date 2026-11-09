@@ -38,7 +38,7 @@ In Vercel, check the Production environment for the variables listed in `.env.ex
 - Set `WHATSAPP_VERIFY_TOKEN` to the same value entered in Meta's webhook setup.
 - Set the production Supabase URL, public key, and service-role key.
 - Set the AI provider key and model if automatic replies are enabled.
-- For push alerts, set the VAPID public/private keys, subject, and `CRON_SECRET`.
+- For push alerts, generate one VAPID pair with `npx web-push generate-vapid-keys`, then set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, server-only `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, and `CRON_SECRET` in the host and redeploy. Enable notifications on each owner device from Settings → Owner alerts. The scheduled `/api/cron/owner-alerts` request needs `Authorization: Bearer <CRON_SECRET>` every five minutes for re-alerts.
 - Do not set a shared `WHATSAPP_REGISTER_PIN`. Each API-only client enters their own six-digit PIN during setup; coexistence clients leave it blank.
 
 Redeploy Production after changing environment variables.
@@ -86,7 +86,7 @@ opt-out and does not send an automated reply to that keyword.
   click-to-chat links from **More → Integrations**. The screen generates a QR
   locally in the browser; source tracking is best effort because a customer can
   edit the prefilled message.
-- Contacts and Reports export UTF-8 CSV files. There is no Google sign-in or
+- Contacts exports apply the current search, tag, group, and consent-status filters. Inbox CSV export follows the selected chat-status filter, Mine switch, and search. Reports export UTF-8 CSV files. There is no Google sign-in or
   live Sheets connection. Shopify and live Sheets sync remain outside this
   release because they require separate OAuth apps and review.
 - Platform access uses the separate `platform_admins` table and requires a

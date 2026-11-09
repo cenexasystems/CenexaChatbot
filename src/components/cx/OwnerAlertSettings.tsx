@@ -50,6 +50,7 @@ function isInstalledPwaSafe() {
 export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
   const [settings, setSettings] = useState<Settings>(EMPTY);
   const [pushKey, setPushKey] = useState<string | null>(null);
+  const [pushConfigured, setPushConfigured] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [whatsappTemplateConfigured, setWhatsappTemplateConfigured] = useState(false);
   const [loading, setLoading] = useState(!demo);
@@ -76,6 +77,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
           });
         }
         setWhatsappTemplateConfigured(alertData.whatsappTemplateConfigured === true);
+        setPushConfigured(alertData.pushConfigured === true);
         setPushKey(pushData.publicKey ?? null);
         // Push subscriptions belong to one browser/device. Do not treat a subscription
         // saved on a laptop as if this phone were already subscribed.
@@ -208,7 +210,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
               {pushSubscribed ? (
                 <Button size="sm" onClick={disablePush} disabled={workingPush}>Turn off</Button>
               ) : (
-                <Button size="sm" variant="primary" onClick={enablePush} disabled={workingPush || !pushKey}>
+                <Button size="sm" variant="primary" onClick={enablePush} disabled={workingPush || !pushConfigured || !pushKey}>
                   {workingPush ? "Working…" : "Enable"}
                 </Button>
               )}
@@ -216,7 +218,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
             {isAppleMobileSafe() && !isInstalledPwaSafe() && (
               <p className="text-[11px] text-ink-faint">On iPhone/iPad, add Cenexa to your Home Screen from Safari, open it there, then enable alerts here.</p>
             )}
-            {!pushKey && <p className="text-[11px] text-attention">Web Push keys need to be configured by the app administrator.</p>}
+            {!pushConfigured && <p className="text-[11px] text-attention">The app administrator must set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT in the hosting environment, then redeploy. Generate a pair once with <code>npx web-push generate-vapid-keys</code>; keep the private key server-only.</p>}
           </section>
 
           <label className="flex items-center justify-between gap-4 border-t border-line pt-4">
@@ -229,7 +231,7 @@ export function OwnerAlertSettings({ demo = false }: { demo?: boolean }) {
               <span><span className="block text-[13px] font-semibold">WhatsApp alert to owner</span><span className="block text-[12px] text-ink-faint">Uses a pre-approved Meta utility template.</span></span>
               <input type="checkbox" name="owner_whatsapp_alerts_enabled" checked={settings.owner_whatsapp_alerts_enabled} onChange={change} disabled={!whatsappTemplateConfigured} className="h-4 w-4 accent-accent" />
             </label>
-            {!whatsappTemplateConfigured && <p className="text-[11px] text-attention">Configure an approved alert template in the app environment to enable this channel.</p>}
+            {!whatsappTemplateConfigured && <p className="text-[11px] text-attention">Set WHATSAPP_OWNER_ALERT_TEMPLATE to the approved Utility template name in the app environment, then redeploy to enable this channel.</p>}
             <label className="block space-y-1">
               <span className="eyebrow !text-[9px]">Owner WhatsApp number</span>
               <input name="owner_whatsapp_number" value={settings.owner_whatsapp_number ?? ""} onChange={change} placeholder="+919876543210" inputMode="tel" className="w-full h-10 rounded-[9px] border border-line-strong bg-surface px-3 text-[13px]" />

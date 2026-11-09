@@ -387,8 +387,9 @@ and invoices remain outside this release; Shopify and live Google Sheets are
 shown as Later with the OAuth/review dependency. English and Tamil remain the
 available translated navigation/Today/filter strings. Hindi is not offered
 until translations and the rest of the new screens receive native-speaker
-review. New environment variables are not required; the platform uses the
-existing Supabase and `CRON_SECRET` settings.
+review. Platform administration uses the existing Supabase and `CRON_SECRET`
+settings. Browser push and WhatsApp owner alerts require the optional settings
+documented below.
 
 Security boundaries: new tables have RLS and no browser policies; export routes
 are tenant scoped; CSV import and queued sending have database-backed limits;
@@ -403,3 +404,46 @@ Rollback companions are `ROLLBACK_20261109_integrations.sql` and
 `ROLLBACK_20261109_platform_admin.sql`. Disable the module and platform
 controls before reverting code; the platform rollback removes audit history,
 admin identities, usage rollups, and the suspension flag.
+
+## Operational improvements: inbox, exports, and knowledge files
+
+Before deploying the optimized inbox and knowledge-file code, apply
+`supabase/migrations/20261110_chatflow_experience.sql` after the 20261109
+migrations. It adds an indexed, tenant-scoped conversation-summary function and
+private knowledge-file/chunk tables. The summary RPC is called only from
+business-authenticated server routes; the knowledge tables have RLS enabled
+with no browser policies. The rollback companion deletes uploaded knowledge
+files, so export any needed source material before using it.
+
+Contacts exports use the current search, tag, group, and consent-status filters.
+Inbox CSV export is admin-only and follows the current chat status filter, Mine
+switch, and search; it exports one row per conversation with its latest message.
+
+Assistant knowledge files accept UTF-8 `.txt`, `.md`, `.csv`, and `.json` files,
+plus text-based `.pdf` files, up to 1 MB each, with a 25-file per-business
+limit. PDFs are limited to 100 pages and scanned PDFs need OCR before upload.
+Uploads are split into searchable chunks and relevant keyword matches are
+supplied to both live AI replies and the Assistant Studio test chat. This
+release uses keyword matching, not semantic/vector search.
+
+To enable browser push alerts, generate one VAPID key pair with
+`npx web-push generate-vapid-keys`, then set these in the hosting environment:
+
+```text
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=<public key>
+VAPID_PRIVATE_KEY=<private key; server only>
+VAPID_SUBJECT=mailto:<monitored-address>
+CRON_SECRET=<random secret>
+```
+
+Redeploy after setting the variables. In Settings → Owner alerts, enable
+notifications on each owner device and allow the browser prompt. The scheduled
+job must call `/api/cron/owner-alerts` every five minutes with
+`Authorization: Bearer <CRON_SECRET>` for re-alerts and queued sends. For
+WhatsApp owner alerts, create and approve a Utility template with three body
+parameters (alert type, customer phone, dashboard link), then set
+`WHATSAPP_OWNER_ALERT_TEMPLATE` and its language before redeploying. Finally,
+save the owner number and enable that channel in the settings panel.
+
+Password changes are available in Settings → Change password for signed-in
+business users. The login form includes a show/hide password control.

@@ -13,7 +13,7 @@ import { templateVariableCount } from "@/lib/templates";
 type Toast = { msg: string; tone: "ok" | "error" } | null;
 
 export function ChatView({ id }: { id: string }) {
-  const { conversations, messages, loadMessages, now, changeMode, sendText, sendImage, verifyPayment, deleteMessage, business, demo, role } = useDashboard();
+  const { conversations, messages, messagePages, loadMessages, loadOlderMessages, now, changeMode, sendText, sendImage, verifyPayment, deleteMessage, business, demo, role } = useDashboard();
   const canReply = !business?.strict_roles || ["admin", "support", "sales"].includes(role);
   const canVerifyPayment = !business?.strict_roles || ["admin", "accounts"].includes(role);
   const params = useSearchParams();
@@ -33,9 +33,12 @@ export function ChatView({ id }: { id: string }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateValues, setTemplateValues] = useState<string[]>([]);
   const [templateBusy, setTemplateBusy] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const preserveScrollRef = useRef<{ height: number; top: number } | null>(null);
 
   useEffect(() => {
     if (!list) loadMessages(id);
@@ -48,7 +51,19 @@ export function ChatView({ id }: { id: string }) {
   useEffect(() => {
     stickRef.current = true;
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [list?.length, id]);
+  }, [id]);
+  useEffect(() => {
+    const area = scrollAreaRef.current;
+    const previous = preserveScrollRef.current;
+    if (area && previous) {
+      requestAnimationFrame(() => {
+        area.scrollTop = area.scrollHeight - previous.height + previous.top;
+        preserveScrollRef.current = null;
+      });
+    } else if (stickRef.current) {
+      endRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [list?.length]);
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -107,6 +122,16 @@ export function ChatView({ id }: { id: string }) {
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleLoadOlder() {
+    const area = scrollAreaRef.current;
+    if (!area || loadingOlder) return;
+    preserveScrollRef.current = { height: area.scrollHeight, top: area.scrollTop };
+    setLoadingOlder(true);
+    try { await loadOlderMessages(id); }
+    catch (error) { showToast(error instanceof Error ? error.message : "Could not load older messages", "error"); }
+    finally { setLoadingOlder(false); }
   }
 
   async function openTemplatePicker() {
@@ -208,6 +233,7 @@ export function ChatView({ id }: { id: string }) {
 
         {/* Messages */}
         <div
+          ref={scrollAreaRef}
           onScroll={(e) => {
             const el = e.currentTarget;
             stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -220,6 +246,7 @@ export function ChatView({ id }: { id: string }) {
             <EmptyState icon="inbox" title="No messages" body="Messages in this chat will appear here." />
           ) : (
             <div ref={contentRef} className="space-y-4 max-w-3xl mx-auto">
+              {messagePages[id]?.hasMore && <div className="text-center"><button type="button" onClick={() => void handleLoadOlder()} disabled={loadingOlder} className="rounded-full border border-line-strong bg-surface px-3 py-1.5 text-[11px] font-semibold text-ink-soft disabled:opacity-50">{loadingOlder ? "Loading older messages…" : "Load older messages"}</button></div>}
               {list.map((m, i) => {
                 const day = new Date(m.created_at).toDateString();
                 const showDay = i === 0 || new Date(list[i - 1].created_at).toDateString() !== day;

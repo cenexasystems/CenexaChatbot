@@ -14,12 +14,13 @@ type Group = { id: string; name: string };
 const inputClass = "rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-[13px] focus:outline-none focus:border-accent";
 
 export function ContactsManager() {
-  const { demo } = useDashboard();
+  const { demo, role } = useDashboard();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
   const [group, setGroup] = useState("");
+  const [status, setStatus] = useState("all");
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -39,36 +40,50 @@ export function ContactsManager() {
       if (query.trim()) params.set("q", query.trim());
       if (tag) params.set("tag", tag);
       if (group) params.set("group", group);
+      if (status !== "all") params.set("status", status);
       if (append && cursor) params.set("cursor", cursor);
-      const [contactResponse, groupResponse] = await Promise.all([fetch(`/api/contacts?${params}`), fetch("/api/contact-groups")]);
-      const [contactData, groupData] = await Promise.all([contactResponse.json().catch(() => ({})), groupResponse.json().catch(() => ({}))]);
-      if (!contactResponse.ok || !groupResponse.ok) throw new Error(contactData.error ?? groupData.error ?? "Could not load contacts");
+      const contactResponse = await fetch(`/api/contacts?${params}`, { cache: "no-store" });
+      const contactData = await contactResponse.json().catch(() => ({}));
+      if (!contactResponse.ok) throw new Error(contactData.error ?? "Could not load contacts");
       setError("");
       setContacts((current) => append ? [...current, ...(contactData.contacts ?? [])] : contactData.contacts ?? []);
       setCursor(contactData.nextCursor ?? null);
-      setGroups(groupData.groups ?? []);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
-  }, [demo, query, tag, group, cursor]);
+  }, [demo, query, tag, group, status, cursor]);
 
   useEffect(() => {
     if (demo) return;
+    const controller = new AbortController();
     let active = true;
     const params = new URLSearchParams({ limit: "50" });
     if (query.trim()) params.set("q", query.trim());
     if (tag) params.set("tag", tag);
     if (group) params.set("group", group);
-    Promise.all([fetch(`/api/contacts?${params}`), fetch("/api/contact-groups")])
-      .then(async ([contactResponse, groupResponse]) => {
-        const [contactData, groupData] = await Promise.all([contactResponse.json().catch(() => ({})), groupResponse.json().catch(() => ({}))]);
-        if (!contactResponse.ok || !groupResponse.ok) throw new Error(contactData.error ?? groupData.error ?? "Could not load contacts");
+    if (status !== "all") params.set("status", status);
+    const timer = setTimeout(() => {
+      setLoading(true);
+      fetch(`/api/contacts?${params}`, { cache: "no-store", signal: controller.signal })
+      .then(async (contactResponse) => {
+        const contactData = await contactResponse.json().catch(() => ({}));
+        if (!contactResponse.ok) throw new Error(contactData.error ?? "Could not load contacts");
         if (!active) return;
-        setContacts(contactData.contacts ?? []); setCursor(contactData.nextCursor ?? null); setGroups(groupData.groups ?? []); setError("");
+        setContacts(contactData.contacts ?? []); setCursor(contactData.nextCursor ?? null); setError("");
       })
-      .catch((e) => { if (active) setError((e as Error).message); })
+      .catch((e) => { if (active && e.name !== "AbortError") setError((e as Error).message); })
       .finally(() => { if (active) setLoading(false); });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [demo, query, tag, group, status]);
+
+  useEffect(() => {
+    if (demo) return;
+    let active = true;
+    fetch("/api/contact-groups", { cache: "no-store" })
+      .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error ?? "Could not load groups"); if (active) setGroups(data.groups ?? []); })
+      .catch((e) => { if (active) setError((e as Error).message); });
     return () => { active = false; };
-  }, [demo, query, tag, group]);
+  }, [demo]);
 
   async function chooseFile(nextFile: File | null) {
     setFile(nextFile); setSummary(null); setConsent(false); setCsv(""); setHeaders([]);
@@ -102,7 +117,10 @@ export function ContactsManager() {
     const response = await fetch("/api/contact-groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) setError(data.error ?? "Could not create group");
-    else await load(false);
+    else {
+      if (data.group) setGroups((current) => [...current, data.group].sort((a, b) => a.name.localeCompare(b.name)));
+      await load(false);
+    }
   }
 
   function downloadSkipped() {
@@ -117,7 +135,14 @@ export function ContactsManager() {
     if (!csv) return [];
     try { return parseContactsCsv(csv, mapping).rows.slice(0, 5); } catch { return []; }
   }, [csv, mapping]);
-  return <Page wide section="Customers" title="Contacts" subtitle="Import, organize, and track customer consent" action={<Button icon="upload" onClick={() => document.getElementById("contacts-csv")?.click()}>Import CSV</Button>}>
+  const exportParams = new URLSearchParams({ format: "csv" });
+  if (query.trim()) exportParams.set("q", query.trim());
+  if (tag) exportParams.set("tag", tag);
+  if (group) exportParams.set("group", group);
+  if (status !== "all") exportParams.set("status", status);
+  const contactsTitle = status === "opted_in" ? "Opted-in contacts" : status === "opted_out" ? "Opted-out contacts" : status === "no_opt_in" ? "Contacts without opt-in" : "All contacts";
+  const canManageContacts = role === "admin" || role === "sales";
+  return <Page wide section="Customers" title="Contacts" subtitle="Import, organize, and track customer consent" action={canManageContacts ? <div className="flex gap-2"><a href={`/api/contacts?${exportParams}`} className="inline-flex h-10 items-center rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-semibold hover:bg-canvas">Export filtered CSV</a><Button icon="upload" onClick={() => document.getElementById("contacts-csv")?.click()}>Import CSV</Button></div> : undefined}>
     <input id="contacts-csv" type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => void chooseFile(event.target.files?.[0] ?? null)} />
     {error && <div role="alert" className="mb-4 rounded-xl border border-danger/30 bg-danger-tint px-4 py-3 text-[13px] text-danger">{error}</div>}
     {summary && <div role="status" className="mb-4 rounded-xl border border-line bg-surface px-4 py-3 text-[13px]">Imported {summary.imported}; skipped {summary.skippedRows.length}. {summary.skippedRows.length > 0 && <button onClick={downloadSkipped} className="ml-2 font-semibold text-accent underline">Download skipped rows</button>}</div>}
@@ -133,12 +158,13 @@ export function ContactsManager() {
       </div>
     </Panel>}
     <div className="flex flex-wrap items-center gap-2 mb-4">
-      <label className="flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface sm:w-72"><Icon name="search" size={16} className="text-ink-faint" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or number" className="flex-1 bg-transparent text-[13px] focus:outline-none" /></label>
+      <label className="flex items-center gap-2 h-10 px-3 rounded-[10px] border border-line-strong bg-surface sm:w-72"><Icon name="search" size={16} className="text-ink-faint" /><input value={query} onChange={(e) => { setQuery(e.target.value); setCursor(null); }} placeholder="Search name or number" className="flex-1 bg-transparent text-[13px] focus:outline-none" /></label>
       <select className={inputClass} value={group} onChange={(e) => { setGroup(e.target.value); setCursor(null); }}><option value="">All groups</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+      <select aria-label="Filter contacts by consent status" className={inputClass} value={status} onChange={(e) => { setStatus(e.target.value); setCursor(null); }}><option value="all">All consent statuses</option><option value="opted_in">Opted in</option><option value="opted_out">Opted out</option><option value="no_opt_in">No opt-in recorded</option></select>
       <Button variant="secondary" size="sm" onClick={createGroup} disabled={demo}>New group</Button>
       {tags.length > 0 && <div className="flex gap-2 overflow-x-auto">{tags.map((item) => <Chip key={item} active={tag === item} onClick={() => { setTag(tag === item ? "" : item); setCursor(null); }}>{item}</Chip>)}</div>}
     </div>
-    <Panel title="All contacts" icon="contacts" meta={<span className="text-[11px] text-ink-faint">{contacts.length} shown</span>}>
+    <Panel title={contactsTitle} icon="contacts" meta={<span className="text-[11px] text-ink-faint">{contacts.length} shown</span>}>
       {loading ? <div className="flex justify-center p-10"><Spinner /></div> : contacts.length === 0 ? <EmptyState icon="contacts" title="No contacts yet" body="Import a consented CSV or wait for customers to message you." /> : <ul className="divide-y divide-line">{contacts.map((contact) => <li key={contact.id}><Link href={`/contacts/${contact.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-canvas"><Avatar name={contact.name} phone={contact.phone} size={34} /><div className="flex-1 min-w-0"><p className="text-[13px] font-semibold truncate">{contact.name || "No name"}</p><p className="text-[11px] text-ink-faint font-mono">{formatPhone(contact.phone)}</p></div><div className="hidden sm:flex gap-1">{contact.tags?.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}</div><span className="text-[11px]">{contact.opt_in_at ? "Opted in" : "No opt-in"}</span></Link></li>)}</ul>}
       {cursor && !loading && <div className="p-4 text-center"><Button variant="secondary" onClick={() => void load(true)}>Load more</Button></div>}
     </Panel>

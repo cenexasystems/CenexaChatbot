@@ -20,3 +20,10 @@ test("strict roles preserve legacy behavior when off and enforce the role matrix
   assert.equal(requirePermission({ role: "support" }, "reports_view")?.status, 403);
   assert.equal(requirePermission({ role: "sales" }, "team_manage")?.status, 403);
 });
+
+test("chat CSV export is restricted to business admins", () => {
+  assert.equal(requirePermission({ role: "admin" }, "conversation_export"), null);
+  assert.equal(requirePermission({ role: "support" }, "conversation_export")?.status, 403);
+  assert.equal(requirePermission({ role: "sales" }, "conversation_export")?.status, 403);
+  assert.equal(requirePermission({ role: "accounts" }, "conversation_export")?.status, 403);
+});

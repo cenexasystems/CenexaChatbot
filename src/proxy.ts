@@ -47,6 +47,10 @@ export async function proxy(request: NextRequest) {
     (p) => request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + "/")
   );
 
+  // Public pages and the login screen do not need an auth round trip. This
+  // keeps first paint snappy; protected routes still verify the user below.
+  if (isPublicPath) return supabaseResponse;
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -55,13 +59,6 @@ export async function proxy(request: NextRequest) {
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
-  // If user IS logged in and tries to access login, redirect to dashboard
-  if (user && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

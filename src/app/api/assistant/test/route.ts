@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireBusinessAccess, requirePermission } from "@/lib/api-auth";
 import { getAIResponse } from "@/lib/ai";
 import { appendHandoffRules, rewriteConfiguredUrls } from "@/lib/assistant-config";
+import { getRelevantKnowledgeContext } from "@/lib/knowledge";
 
 type TestMessage = { role: "user" | "assistant"; content: string };
 
@@ -41,9 +42,10 @@ export async function POST(request: NextRequest) {
     rewriteConfiguredUrls(business.system_prompt, business.url_rewrite_from, business.url_rewrite_to),
     business.handoff_rules
   );
+  const knowledge = await getRelevantKnowledgeContext(admin, businessId, messages[messages.length - 1].content);
   const result = await getAIResponse(
     messages.map((message) => ({ role: message.role, content: message.content.trim() })),
-    prompt,
+    `${prompt ?? ""}${knowledge}`,
     business.openrouter_api_key ?? undefined,
     business.ai_model ?? undefined,
     business.media_ai_enabled === true

@@ -21,12 +21,14 @@ type Ctx = {
   error: string | null;
   conversations: ConversationWithLastMessage[];
   messages: Record<string, Message[] | undefined>;
+  messagePages: Record<string, { hasMore: boolean; cursor: string | null }>;
   now: number;
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (k: StringKey) => string;
   refresh: () => Promise<void>;
   loadMessages: (id: string) => Promise<void>;
+  loadOlderMessages: (id: string) => Promise<boolean>;
   sendText: (id: string, text: string) => Promise<void>;
   sendImage: (id: string, file: File, caption: string) => Promise<void>;
   sendQR: (id: string, newQrFile?: File) => Promise<void>;
@@ -70,6 +72,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>(demoData?.conversations ?? []);
   const [messages, setMessages] = useState<Record<string, Message[] | undefined>>(demoData?.messages ?? {});
+  const [messagePages, setMessagePages] = useState<Record<string, { hasMore: boolean; cursor: string | null }>>({});
   const [now, setNow] = useState(() => Date.now());
   const [lang, setLangState] = useState<Lang>(readLang);
   const convoIds = useRef(new Set<string>());
@@ -146,10 +149,33 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const loadMessages = useCallback(async (id: string) => {
     if (DEMO_MODE) return;
-    const res = await fetch(`/api/conversations/${id}/messages`);
-    const data = await res.json().catch(() => []);
-    if (Array.isArray(data)) setMessages((m) => ({ ...m, [id]: data }));
+    const res = await fetch(`/api/conversations/${id}/messages?limit=100`, { cache: "no-store" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(data?.messages)) return;
+    setMessages((all) => {
+      const merged = new Map((all[id] ?? []).map((message) => [message.id, message]));
+      for (const message of data.messages as Message[]) merged.set(message.id, message);
+      return { ...all, [id]: [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+    });
+    setMessagePages((current) => ({ ...current, [id]: { hasMore: Boolean(data.hasMore), cursor: data.nextCursor ?? null } }));
   }, []);
+
+  const loadOlderMessages = useCallback(async (id: string): Promise<boolean> => {
+    if (DEMO_MODE) return false;
+    const page = messagePages[id];
+    if (!page?.hasMore || !page.cursor) return false;
+    const params = new URLSearchParams({ limit: "100", before: page.cursor });
+    const response = await fetch(`/api/conversations/${id}/messages?${params}`, { cache: "no-store" });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !Array.isArray(data?.messages)) throw new Error(data?.error ?? "Could not load older messages");
+    setMessages((all) => {
+      const merged = new Map((all[id] ?? []).map((message) => [message.id, message]));
+      for (const message of data.messages as Message[]) merged.set(message.id, message);
+      return { ...all, [id]: [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+    });
+    setMessagePages((current) => ({ ...current, [id]: { hasMore: Boolean(data.hasMore), cursor: data.nextCursor ?? null } }));
+    return Boolean(data.hasMore);
+  }, [messagePages]);
 
   // ── Realtime ──
   useEffect(() => {
@@ -379,12 +405,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     error,
     conversations,
     messages,
+    messagePages,
     now,
     lang,
     setLang,
     t,
     refresh,
     loadMessages,
+    loadOlderMessages,
     sendText,
     sendImage,
     sendQR,
