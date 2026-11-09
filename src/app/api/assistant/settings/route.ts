@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireBusinessAccess } from "@/lib/api-auth";
+import { requireBusinessAccess, requirePermission } from "@/lib/api-auth";
 
 const FIELDS = "system_prompt, welcome_message, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to";
 
@@ -21,8 +21,9 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
-  const { businessId, role, admin } = access;
-  if (role !== "admin") return Response.json({ error: "Only a business admin can change assistant settings" }, { status: 403 });
+  const denied = requirePermission(access, "assistant_settings");
+  if (denied) return denied;
+  const { businessId, admin } = access;
 
   let body: Record<string, unknown>;
   try {

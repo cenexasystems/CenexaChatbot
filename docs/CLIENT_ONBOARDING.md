@@ -11,6 +11,25 @@ This checklist is for production. Payment integration is not part of this releas
 
 Do not run `staging-schema.sql` against production; it is a database bootstrap script, not an incremental migration.
 
+Campaign and automation setup (Phases 3 and 4) depends on the contact timeline
+schema. Apply migrations in this order when missing: module flags, templates,
+contacts, then campaigns and automations. Leave both module flags off until a
+business-specific pilot is ready. Before enabling campaigns, add verified
+Meta rate rows to `campaign_pricing`; rates are intentionally not guessed or
+seeded by the migration.
+
+Reports and Team (Phases 5 and 6) depend on contacts, campaigns/automations,
+and owner alerts. Apply `20261109_reports_team.sql` only after those tables are
+present. Confirm the profile-to-Auth verification check is zero. Reports use
+the owner-alert timezone and label payment history from
+`reporting_history_start_date`. Team invitations require Supabase Auth email
+delivery and an allowed `/login` redirect. Strict role enforcement stays off
+until an admin opts in for a business.
+
+For invite acceptance, set the Supabase Invite user email template link to
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite` and allow
+the production `/auth/confirm` redirect URL.
+
 ## 2. Set production app configuration
 
 In Vercel, check the Production environment for the variables listed in `.env.example`. Keep secrets server-side. In particular:
@@ -47,3 +66,31 @@ The current self-service flow supports one WhatsApp phone number per business se
 ## Release gate
 
 Do not onboard external businesses until the production migration is applied, Meta webhook signatures are enforced, and one complete inbound/outbound message cycle has been confirmed for the first client.
+
+## Message templates
+
+To manage templates, the connected business must have a `waba_id` and its
+WhatsApp access token must include `whatsapp_business_management`. Templates
+submitted through ChatFlow remain unavailable for sending until Meta marks them
+approved. Marketing templates are not sendable until contact opt-in tracking
+ships in Phase 2; use Utility templates for transactional updates in Phase 1.
+
+When importing contacts, only include people who opted in to WhatsApp messages.
+The importer requires the owner to confirm consent and records its source.
+Customers can opt out by replying `STOP` or `UNSUBSCRIBE`; ChatFlow records the
+opt-out and does not send an automated reply to that keyword.
+
+## Tracked links and platform administration
+
+- Enable the Integrations module for a business, then create source-specific
+  click-to-chat links from **More → Integrations**. The screen generates a QR
+  locally in the browser; source tracking is best effort because a customer can
+  edit the prefilled message.
+- Contacts and Reports export UTF-8 CSV files. There is no Google sign-in or
+  live Sheets connection. Shopify and live Sheets sync remain outside this
+  release because they require separate OAuth apps and review.
+- Platform access uses the separate `platform_admins` table and requires a
+  verified TOTP factor. The initial owner must first sign in and open
+  `/admin/mfa` to enroll, then an operator seeds that Auth user ID as `owner`.
+  All tenant changes require a reason and confirmation and appear in the
+  append-only platform audit log.

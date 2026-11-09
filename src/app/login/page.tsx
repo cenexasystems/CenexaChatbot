@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Image from "next/image";
-import { login, signup } from "./actions";
+import { acceptInvitePassword, login, signup } from "./actions";
 
 function LockIcon() {
   return (
@@ -23,8 +23,13 @@ function EyeIcon({ crossed = false }: { crossed?: boolean }) {
   );
 }
 
-export default function LoginPage() {
-  const [error, setError] = useState<string | null>(null);
+type LoginSearchParams = Promise<{ invite?: string; error?: string }>;
+
+export default function LoginPage({ searchParams }: { searchParams: LoginSearchParams }) {
+  const query = use(searchParams);
+  const isInvite = query.invite === "1";
+  const queryError = query.error === "expired_invitation" ? "This invitation link expired. Ask your admin to send a new invitation." : query.error === "invalid_invitation" ? "This invitation link is invalid." : null;
+  const [error, setError] = useState<string | null>(queryError);
   const [isPending, setIsPending] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +38,7 @@ export default function LoginPage() {
     setIsPending(true);
     setError(null);
     try {
-      const result = await (mode === "login" ? login : signup)(formData);
+      const result = await (isInvite ? acceptInvitePassword : mode === "login" ? login : signup)(formData);
       if (result?.error) setError(result.error);
     } catch (err) {
       if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) throw err;
@@ -61,10 +66,10 @@ export default function LoginPage() {
 
           <div className="mt-8 text-center">
             <h1 className="text-[21px] font-extrabold tracking-[0.01em] text-[#17263B]">
-              {isLogin ? "Welcome back" : "Create your account"}
+              {isInvite ? "Set your password" : isLogin ? "Welcome back" : "Create your account"}
             </h1>
               <p className="mt-2 text-sm leading-6 text-[#53627A]">
-              {isLogin ? "Sign in to manage your WhatsApp workspace." : "Create an account to set up your WhatsApp workspace."}
+              {isInvite ? "Finish setting up your team account." : isLogin ? "Sign in to manage your WhatsApp workspace." : "Create an account to set up your WhatsApp workspace."}
             </p>
           </div>
 
@@ -96,7 +101,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete={isLogin ? "current-password" : "new-password"}
                   required
-                  minLength={6}
+                  minLength={isInvite ? 8 : 6}
                   placeholder="Enter your password"
                   className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#17263B] placeholder:text-[#7B8CA3] outline-none"
                 />
@@ -122,7 +127,7 @@ export default function LoginPage() {
               disabled={isPending}
               className="mt-2 flex h-[50px] w-full items-center justify-center gap-2 rounded-[13px] bg-gradient-to-r from-[#0B3B8C] via-[#087DBB] to-[#078BCB] text-xs font-extrabold uppercase tracking-[0.16em] text-white shadow-[0_10px_18px_rgba(7,91,164,0.24)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#078BCB]/25 disabled:cursor-wait disabled:opacity-60"
             >
-              {isPending ? "Please wait…" : isLogin ? "Authenticate" : "Create account"}
+              {isPending ? "Please wait…" : isInvite ? "Set password and continue" : isLogin ? "Authenticate" : "Create account"}
               {!isPending && isLogin && <span aria-hidden="true" className="text-base leading-none">›</span>}
             </button>
           </form>
@@ -134,7 +139,7 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <p className="mt-5 text-center text-xs text-[#53627A]">
+          {!isInvite && <p className="mt-5 text-center text-xs text-[#53627A]">
             {isLogin ? "New to Cenexa? " : "Already have an account? "}
             <button
               type="button"
@@ -143,7 +148,7 @@ export default function LoginPage() {
             >
               {isLogin ? "Create an account" : "Sign in"}
             </button>
-          </p>
+          </p>}
         </section>
 
         <p className="mt-5 text-center text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#71839A]">

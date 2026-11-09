@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDashboard } from "../DashboardProvider";
 import { Avatar, EmptyState, FilterTabs, Status, cx } from "../ui";
 import { Icon } from "../icons";
@@ -33,9 +33,11 @@ const EMPTY: Record<InboxFilter, { title: string; body: string }> = {
 };
 
 export function ConversationList({ selectedId }: { selectedId: string | null }) {
-  const { conversations, now, t } = useDashboard();
+  const { conversations, now, t, userId } = useDashboard();
+  const router = useRouter();
   const params = useSearchParams();
   const filter = parseFilter(params.get("filter"));
+  const mine = params.get("mine") === "1";
   const [query, setQuery] = useState("");
 
   const counts = useMemo(() => {
@@ -47,6 +49,7 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = conversations.filter((c) => matchesFilter(c, filter, now));
+    if (mine && userId) out = out.filter((c) => c.assigned_to === userId);
     if (q) {
       const digits = q.replace(/\D/g, "");
       out = out.filter(
@@ -56,9 +59,9 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
     return filter === "needs-you" || filter === "money"
       ? sortByUrgency(out, now)
       : [...out].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  }, [conversations, filter, query, now]);
+  }, [conversations, filter, query, now, mine, userId]);
 
-  const qs = filter === "all" ? "" : `?filter=${filter}`;
+  const qs = `${filter === "all" ? "" : `?filter=${filter}`}${mine ? `${filter === "all" ? "?" : "&"}mine=1` : ""}`;
 
   return (
     <div className="h-full flex flex-col bg-surface">
@@ -87,9 +90,11 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
       <FilterTabs
         label="Filter chats"
         active={filter}
-        hrefFor={(f) => (f === "all" ? "/inbox" : `/inbox?filter=${f}`)}
+        hrefFor={(f) => (f === "all" ? `/inbox${mine ? "?mine=1" : ""}` : `/inbox?filter=${f}${mine ? "&mine=1" : ""}`)}
         items={FILTERS.map((f) => ({ id: f, label: t(`filter.${f}`), count: f === "needs-you" || f === "money" ? counts[f] : undefined }))}
       />
+
+      {userId && <div className="px-4 pt-2"><button type="button" aria-pressed={mine} onClick={() => router.push(`/inbox${filter === "all" ? "" : `?filter=${filter}`}${mine ? "" : `${filter === "all" ? "?" : "&"}mine=1`}`)} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${mine ? "border-brand bg-brand text-white" : "border-line text-ink-soft hover:bg-canvas"}`}>Mine</button></div>}
 
       <div className="flex-1 overflow-y-auto">
         {list.length === 0 ? (
@@ -127,7 +132,7 @@ function rowStatus(c: ConversationWithLastMessage, now: number) {
 
 function Row({ convo: c, selected, href, now }: { convo: ConversationWithLastMessage; selected: boolean; href: string; now: number }) {
   const sender =
-    c.last_message_role === "user" ? "" : c.last_message_source === "dashboard" ? "You: " : c.last_message_source === "business_app" ? "Phone: " : "AI: ";
+    c.last_message_role === "user" ? "" : c.last_message_source === "dashboard" || c.last_message_source === "template" ? "You: " : c.last_message_source === "business_app" ? "Phone: " : "AI: ";
   const urgent = needsYou(c, now);
   return (
     <Link

@@ -10,10 +10,10 @@ import { OwnerAlertSettings } from "@/components/cx/OwnerAlertSettings";
 import { WhatsAppConnection } from "@/components/cx/WhatsAppConnection";
 import { PwaInstallCard } from "@/components/cx/PwaInstallCard";
 
-type Item = { icon: IconName; label: string; hint: string; href?: string; count?: number };
+type Item = { icon: IconName; label: string; hint: string; href?: string; count?: number; state?: "Later" };
 
 export default function MorePage() {
-  const { business, conversations, lang, setLang, demo } = useDashboard();
+  const { business, conversations, lang, setLang, demo, role } = useDashboard();
   const money = conversations.filter(isMoneyToConfirm).length;
 
   const groups: { title: string; items: Item[] }[] = [
@@ -21,18 +21,18 @@ export default function MorePage() {
       title: "Operations",
       items: [
         { icon: "rupee", label: "Payments", hint: "Screenshots to verify", href: "/inbox?filter=money", count: money },
-        { icon: "template", label: "Templates", hint: "Approved messages for offers and reminders" },
-        { icon: "flow", label: "Automations", hint: "Follow-ups, reminders, review requests" },
-        { icon: "chart", label: "Reports", hint: "Chats, leads and sales over time" },
-        { icon: "team", label: "Team", hint: "Staff accounts and permissions" },
+        { icon: "template", label: "Templates", hint: "Approved messages for offers and reminders", href: business?.modules_enabled?.templates ? "/templates" : undefined },
+        ...(role === "admin" ? [{ icon: "flow" as const, label: "Automations", hint: "Follow-ups, reminders, review requests", href: business?.modules_enabled?.automations ? "/automations" : undefined }] : []),
+        ...(role === "admin" || role === "accounts" ? [{ icon: "chart" as const, label: "Reports", hint: "Chats, leads and sales over time", href: business?.modules_enabled?.reports ? "/reports" : undefined }] : []),
+        ...(role === "admin" ? [{ icon: "team" as const, label: "Team", hint: "Staff accounts and permissions", href: business?.modules_enabled?.team ? "/team" : undefined }] : []),
       ],
     },
     {
       title: "Account",
       items: [
         { icon: "wifi", label: "WhatsApp connection", hint: "Phone app link, sync and connection status", href: "#whatsapp-connection" },
-        { icon: "wallet", label: "Wallet and invoices", hint: "Message costs and GST invoices" },
-        { icon: "plug", label: "Integrations", hint: "Website, Shopify, sheets" },
+        { icon: "wallet", label: "Wallet and invoices", hint: "Payment collection and invoices are outside the current release", state: "Later" },
+        { icon: "plug", label: "Integrations", hint: "Tracked links and spreadsheet exports", href: "/integrations" },
       ],
     },
   ];
@@ -68,7 +68,7 @@ export default function MorePage() {
                 </button>
               ))}
             </div>
-            <p className="text-[12px] text-ink-faint mt-2">Hindi next. Some screens are English only for now.</p>
+            <p className="text-[12px] text-ink-faint mt-2">Hindi is not available in this release.</p>
           </div>
         </Panel>
 
@@ -104,7 +104,7 @@ export default function MorePage() {
   );
 }
 
-function Row({ icon, label, hint, href, count }: Item) {
+function Row({ icon, label, hint, href, count, state }: Item) {
   const inner = (
     <>
       <span className="w-8 h-8 rounded-lg border border-line bg-canvas text-ink-soft flex items-center justify-center shrink-0">
@@ -115,7 +115,7 @@ function Row({ icon, label, hint, href, count }: Item) {
         <p className="text-[12px] text-ink-faint truncate">{hint}</p>
       </div>
       {!!count && <span className="min-w-[20px] h-5 px-1.5 rounded-md bg-attention text-white text-[11px] font-bold flex items-center justify-center tabular">{count}</span>}
-      {href ? <Icon name="chevron" size={16} className="text-ink-faint" /> : <span className="eyebrow !text-[9.5px] border border-line rounded px-1.5 py-0.5">Planned</span>}
+      {href ? <Icon name="chevron" size={16} className="text-ink-faint" /> : <span className="eyebrow !text-[9.5px] border border-line rounded px-1.5 py-0.5">{state ?? "Unavailable"}</span>}
     </>
   );
   const cls = "flex items-center gap-3 px-4 py-3";

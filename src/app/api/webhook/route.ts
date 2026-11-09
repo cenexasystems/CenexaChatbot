@@ -9,8 +9,11 @@ import { analyzeImage, analyzeVoiceNote, describeMediaForAI } from "@/lib/media-
 import { getSupabase } from "@/lib/supabase";
 import { parseDeliveryStatusEvent } from "@/lib/delivery-status";
 import { enqueueOwnerAlert, resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
+import { recordContactActivity } from "@/lib/activity";
+import { cancelAutomationForConversation, enqueueAutomationForConversation } from "@/lib/automation-queue";
 import { isPersonHandoffRequest } from "@/lib/handoff";
 import { appendHandoffRules, isConfiguredGreeting, rewriteConfiguredUrls } from "@/lib/assistant-config";
+import { parseClickToChatSource } from "@/lib/integrations";
 
 // Voice/vision + AI reply can take several seconds. We ack Meta immediately and
 // keep working via after(); this raises the ceiling for that background work.
@@ -158,7 +161,19 @@ async function handleDeliveryStatus(value: any, event: any) {
     console.error("[webhook] delivery status message lookup failed:", messageError.message);
     return;
   }
-  if (!message) return;
+  if (!message) {
+    const { data: campaignRecipient } = await supabase.from("campaign_recipients").select("id,status,business_id").eq("meta_message_id", update.messageId).eq("business_id", business.id).maybeSingle();
+    if (!campaignRecipient) return;
+    const next = update.status === "failed" ? "failed" : update.status;
+    const ranks: Record<string, number> = { sent: 1, delivered: 2, read: 3, replied: 4, paid: 5 };
+    if (next === "failed" && ["sent", "queued", "processing"].includes(campaignRecipient.status)) {
+      await supabase.from("campaign_recipients").update({ status: "failed", error_code: update.errorCode }).eq("id", campaignRecipient.id).eq("business_id", business.id);
+    } else if (ranks[next] && ranks[next] > (ranks[campaignRecipient.status] ?? 0)) {
+      const timestamp = new Date().toISOString();
+      await supabase.from("campaign_recipients").update({ status: next, ...(next === "delivered" ? { delivered_at: timestamp } : {}), ...(next === "read" ? { read_at: timestamp } : {}) }).eq("id", campaignRecipient.id).eq("business_id", business.id);
+    }
+    return;
+  }
 
   // WAMIDs are unique, but also verify the conversation belongs to the webhook tenant.
   const { data: conversation, error: conversationError } = await supabase
@@ -190,10 +205,11 @@ async function getBusiness(phoneNumberId?: string) {
   const { data } = await getSupabase()
     .from("businesses")
     .select(
-      "id, access_token, openrouter_api_key, ai_model, system_prompt, welcome_message, handoff_minutes, vision_model, media_ai_enabled, coexistence_enabled, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to"
+      "id, access_token, openrouter_api_key, ai_model, system_prompt, welcome_message, handoff_minutes, vision_model, media_ai_enabled, coexistence_enabled, modules_enabled, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to, platform_suspended"
     )
     .eq("phone_number_id", phoneNumberId)
     .eq("is_active", true)
+    .eq("platform_suspended", false)
     .maybeSingle();
   return data;
 }
@@ -340,6 +356,45 @@ async function handleIncoming(value: any, message: any) {
   const messageRowId: string | null = inserted?.id ?? null;
 
   await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation.id);
+
+  // Contact writes are opt-in per tenant; with the flag off, legacy webhook behavior is preserved.
+  let contactId: string | null = null;
+  if (biz?.modules_enabled?.contacts === true && businessId) {
+    const attributedCode = biz.modules_enabled?.integrations === true ? parseClickToChatSource(text) : null;
+    let attributedSource: string | null = null;
+    if (attributedCode) {
+      const { data: sourceLink } = await supabase.from("integration_links").select("source_code").eq("business_id", businessId).eq("source_code", attributedCode).maybeSingle();
+      attributedSource = sourceLink?.source_code ?? null;
+    }
+    const { data: contact } = await supabase.from("contacts").upsert({
+      business_id: businessId, phone, name: name || null, source: attributedSource ?? "whatsapp", conversation_id: conversation.id,
+    }, { onConflict: "business_id,phone", ignoreDuplicates: true }).select("id").maybeSingle();
+    contactId = contact?.id ?? null;
+    if (!contactId) {
+      const { data: existingContact } = await supabase.from("contacts").select("id,source").eq("business_id", businessId).eq("phone", phone).maybeSingle();
+      contactId = existingContact?.id ?? null;
+      if (contactId) await supabase.from("contacts").update({ conversation_id: conversation.id, ...(attributedSource && ["whatsapp", "conversation"].includes(existingContact?.source ?? "") ? { source: attributedSource } : {}), updated_at: new Date().toISOString() }).eq("id", contactId).eq("business_id", businessId);
+    }
+    if (biz?.modules_enabled?.campaigns === true) {
+      const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
+      const { data: recipient } = await supabase.from("campaign_recipients").select("id,campaign_id,status,contact_id").eq("business_id", businessId).eq("phone", phone).gte("sent_at", windowStart).in("status", ["sent", "delivered", "read"]).order("sent_at", { ascending: false }).limit(1).maybeSingle();
+      if (recipient) {
+        await supabase.from("campaign_recipients").update({ status: "replied", replied_at: new Date().toISOString() }).eq("id", recipient.id).eq("business_id", businessId);
+        await supabase.from("activity_events").insert({ business_id: businessId, contact_id: recipient.contact_id, conversation_id: conversation.id, event_type: "campaign_replied", details: { campaign_id: recipient.campaign_id, attribution: "within 7 days" } });
+      }
+    }
+    if (contactId) {
+      await cancelAutomationForConversation(businessId, conversation.id, "Customer replied");
+      await enqueueAutomationForConversation(businessId, conversation.id, "follow_up", `inbound:${message.id}`);
+    }
+    if (msgType === "text" && /^\s*(stop|unsubscribe|stop all)\s*[.!]?\s*$/i.test(text)) {
+      await supabase.from("contacts").update({ opt_out_at: new Date().toISOString() }).eq("business_id", businessId).eq("phone", phone);
+      const resolvedContact = contactId ? { id: contactId } : (await supabase.from("contacts").select("id").eq("business_id", businessId).eq("phone", phone).maybeSingle()).data;
+      if (resolvedContact?.id) await supabase.from("activity_events").insert({ business_id: businessId, contact_id: resolvedContact.id, conversation_id: conversation.id, event_type: "opt_out", details: { source: "whatsapp_keyword" } });
+      return;
+    }
+    if (isPaymentScreenshot) await recordContactActivity(supabase, businessId, conversation.id, "payment_pending");
+  }
 
   const reply = async (content: string) => {
     const result = await sendWhatsAppMessage(phone, content, sendOpts);

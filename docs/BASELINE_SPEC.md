@@ -214,3 +214,59 @@ For the business whose `system_prompt` or `welcome_message` contains `https://b2
 ---
 
 *This spec was generated during Phase 0 (2026-10-13). Update after any intentional behaviour change.*
+## Scenario L: Contacts module is opt-in per business
+
+With `businesses.modules_enabled.contacts` missing or false, inbound webhook
+handling does not create contacts or activity events, and the existing
+conversation/message path remains active. With the flag true, the contact is
+created once per `(business_id, phone)` and an exact `STOP`/`UNSUBSCRIBE`
+message records opt-out without triggering an AI reply.
+
+## Phase 3 and 4 invariants: campaigns and automations
+
+- Campaign recipients must have recorded opt-in and no opt-out timestamp; the
+  campaign must use a business-owned approved template.
+- Campaign sends obey the tenant emergency pause and daily cap. Pricing
+  estimates require configured country/category rates and show their `as_of`
+  date; they do not represent a charge.
+- Campaign sends and automation sends do not create a customer chat message.
+  An automation message is stored with `source = 'automation'` only after the
+  send succeeds.
+- Automation sends skip opted-out contacts, obey Asia/Kolkata quiet hours and
+  the WhatsApp 24-hour window, use an approved template outside that window,
+  and reserve at most one send per contact per local day.
+- Customer replies, payment verification, and human takeover cancel queued
+  automation runs. Payment reminders require an outstanding QR payment;
+  review requests require verified payment.
+
+## Phase 5 and 6 invariants: reports and team
+
+- Reports are database-aggregated, scoped to the authenticated business, and
+  available to admin/accounts only when the Reports module is enabled.
+- Report dates use `owner_alert_timezone`. Payment and sales series start at
+  `reporting_history_start_date`; older payment changes have no event history.
+  CSV rows are returned from the same report query as the UI.
+- Team routes are tenant-scoped. Invitations create profiles for Supabase Auth
+  user IDs, invited profiles activate at first sign-in, and disabled profiles
+  are rejected even if the browser retains an Auth session.
+- A serialized database update prevents demoting or deactivating the final
+  active admin. `strict_roles = false` retains legacy behavior; when enabled,
+  routes and controls enforce the documented role matrix.
+- Assignments use active profile IDs from the same business; the Mine filter
+  shows chats assigned to the current user.
+
+## Phase 7 and platform control-plane invariants
+
+- With Integrations off, webhook behavior and contact attribution are unchanged.
+- Tracked WhatsApp source attribution requires an exact per-business source-code
+  match. If a customer edits out the prefilled source line, attribution is absent.
+- Platform APIs require an enabled `platform_admins` record and an AAL2 MFA
+  session. Tenant profiles alone never grant platform access.
+- Read-only platform admins cannot write; support can change module flags only;
+  owners can change tenant settings and platform-admin access.
+- Every platform change requires an explicit confirmation and reason, and the
+  update and append-only audit entry commit in one database transaction.
+- Platform responses contain tenant metadata and counts only; they never return
+  access tokens, provider API keys, or customer message bodies.
+- A suspended tenant receives a clear app notice, tenant APIs reject access,
+  and webhook processing skips that business.

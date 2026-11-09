@@ -1,269 +1,43 @@
-# WhatsApp AI Agent
+# Cenexa ChatFlow
 
-A full-stack WhatsApp AI agent built with Next.js. It receives messages via the Meta WhatsApp Business API, generates AI replies using OpenRouter, and provides a real-time dashboard to view and manage all conversations. It also has `Human` & `AI` reply mode
+Cenexa ChatFlow is a multi-tenant WhatsApp operations dashboard built with Next.js 16, Supabase, Meta's WhatsApp Business API, and OpenRouter. It includes an AI inbox, human handoff, payment screenshot verification, owner alerts, templates, contacts and customer timelines, campaigns, automations, reporting, team roles, tracked WhatsApp links, and an MFA-protected Cenexa platform console.
 
-## Architecture
+## Local setup
 
-```
-User sends WhatsApp message
-  -> Meta forwards to POST /api/webhook
-  -> Message stored in Supabase
-  -> Sent to AI model (OpenRouter)
-  -> AI reply sent back via Meta Graph API
-  -> Reply stored in Supabase
-  -> Dashboard updates in real-time
-```
+1. Install Node dependencies with `npm ci`.
+2. Copy `.env.example` to `.env.local` and fill in the Supabase, Meta, AI, VAPID, and cron settings required for the features you use.
+3. For a disposable staging database, use [`supabase/staging-schema.sql`](supabase/staging-schema.sql), which starts from the core schema and replays the dated migrations. For production, apply only the additive SQL files in `supabase/migrations/` in the documented dependency order; never run the staging bootstrap against production.
+4. Start the app with `npm run dev`.
 
-## Tech Stack
+Useful checks are `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build`.
 
-- **Framework:** Next.js 16 (App Router, TypeScript)
-- **Database:** Supabase (PostgreSQL + Realtime)
-- **AI:** OpenRouter API (OpenAI-compatible)
-- **Styling:** Tailwind CSS
+## Feature flags
 
-## Getting Started
+The `businesses.modules_enabled` JSON object controls Templates, Contacts, Campaigns, Automations, Reports, Team, and Integrations per business. New modules default to off. Turn on a module only after its migration is applied and the production code is deployed. Campaign sending also requires recorded opt-in, an approved template, configured pricing, the per-business daily cap, and an active sending switch.
 
-### 1. Install dependencies
+See [`docs/ROLLOUT.md`](docs/ROLLOUT.md) for production migration order, rollback files, per-business rollout guidance, and platform-console bootstrap. See [`docs/CLIENT_ONBOARDING.md`](docs/CLIENT_ONBOARDING.md) for WhatsApp setup, consent, templates, and tracked links.
 
-```bash
-npm install
-```
+## Security boundaries
 
-### 2. Set up environment variables
+- Tenant routes use `requireBusinessAccess` and scope database reads/writes to the authenticated business.
+- New feature tables use RLS with no browser policies; privileged access stays on server routes.
+- Platform access uses `platform_admins`, requires verified MFA (AAL2), and never exposes tenant tokens, provider keys, or customer message contents.
+- Platform writes require a reason and confirmation and are audited transactionally in append-only `platform_audit_log`.
+- The scheduled `/api/cron/owner-alerts` route requires `Authorization: Bearer $CRON_SECRET` and writes its latest heartbeat.
+- CSV exports include a UTF-8 BOM for spreadsheet compatibility. Shopify and live Google Sheets integrations are labeled Later; exports do not require OAuth.
 
-Copy the example and fill in your credentials:
+## Main routes
 
-```bash
-cp .env.example .env.local
-```
-
-| Variable | Description |
+| Route | Purpose |
 |---|---|
-| `WHATSAPP_ACCESS_TOKEN` | Permanent token from Meta Business > System Users |
-| `WHATSAPP_PHONE_NUMBER_ID` | From Meta App > WhatsApp > API Setup |
-| `WHATSAPP_VERIFY_TOKEN` | Any string you choose for webhook verification |
-| `OPENROUTER_API_KEY` | API key from openrouter.ai |
-| `AI_MODEL` | Model ID (e.g. `anthropic/claude-sonnet-4-20250514`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `/today`, `/inbox` | Daily queue and WhatsApp conversations |
+| `/templates`, `/contacts`, `/campaigns`, `/automations`, `/reports`, `/team`, `/integrations` | Tenant feature screens (per-business flags apply) |
+| `/integrations` | Tracked click-to-chat links, local QR generation, CSV exports |
+| `/admin` | MFA-gated Cenexa tenant operations console |
+| `/admin/platform-admins` | Owner-only platform access management |
+| `/api/webhook` | Meta WhatsApp webhook |
+| `/api/cron/owner-alerts` | Owner alerts, campaign and automation queues, usage rollup and heartbeat |
 
-### 3. Set up the database
+## Language
 
-Create these tables in your Supabase project (via SQL Editor or MCP):
-
-```sql
-create table conversations (
-  id uuid default gen_random_uuid() primary key,
-  phone text unique not null,
-  name text,
-  mode text not null default 'agent' check (mode in ('agent', 'human')),
-  updated_at timestamp with time zone default now(),
-  created_at timestamp with time zone default now()
-);
-
-create table messages (
-  id uuid default gen_random_uuid() primary key,
-  conversation_id uuid references conversations(id) on delete cascade not null,
-  role text not null check (role in ('user', 'assistant')),
-  content text not null,
-  whatsapp_msg_id text unique,
-  created_at timestamp with time zone default now()
-);
-
-create index idx_messages_conversation on messages(conversation_id);
-create index idx_conversations_updated on conversations(updated_at desc);
-
--- Enable real-time
-alter publication supabase_realtime add table messages;
-alter publication supabase_realtime add table conversations;
-```
-
-### 4. Run the dev server
-
-```bash
-npm run dev
-```
-
-### 5. Expose your local server
-
-Use ngrok (or deploy to Vercel) to get a public URL:
-
-```bash
-ngrok http 3000
-```
-
-### 6. Configure the Meta webhook
-
-1. Go to [Meta App Dashboard](https://developers.facebook.com) > your app > WhatsApp > Configuration
-2. Set webhook URL to `https://your-url.com/api/webhook`
-3. Set verify token to match your `WHATSAPP_VERIFY_TOKEN`
-4. Subscribe to the **messages** field
-
-## API Routes
-
-| Method | Route | Description |
-|---|---|---|
-| GET | `/api/webhook` | Meta webhook verification |
-| POST | `/api/webhook` | Receive incoming WhatsApp messages |
-| GET | `/api/conversations` | List all conversations |
-| PATCH | `/api/conversations/[id]` | Update conversation mode (agent/human) |
-| GET | `/api/conversations/[id]/messages` | Get messages for a conversation |
-| POST | `/api/conversations/[id]/send` | Send a manual message from the dashboard |
-
-## Dashboard Features
-
-- **Sidebar:** All conversations sorted by latest message, with mode badges (AI/Human)
-- **Chat panel:** WhatsApp-style message bubbles with timestamps
-- **Mode toggle:** Switch between Agent (AI auto-reply) and Human (manual reply) per conversation
-- **Manual send:** Type and send messages from the dashboard in either mode
-- **Real-time:** New messages appear instantly via Supabase Realtime
-
-## Deployment
-
-Deploy to Vercel:
-
-```bash
-vercel
-```
-
-Then update your Meta webhook URL to point to your Vercel deployment.
-
-## Owner alerts setup
-
-Owner alerts can notify subscribed browsers when a customer asks for a person or sends a payment screenshot. The optional WhatsApp channel requires an approved Meta **utility** template.
-
-1. Apply the additive migrations in `supabase/migrations/` to staging first, verify the app, then apply them to the intended production database before deploying code that uses the new columns.
-   The dashboard rollout migration adds `businesses.dashboard_v2_enabled` as `false` for every business. Keep it false during the pilot; enable a business only after its owners accept the new UI. The classic `/` dashboard stays available until the two-customer daily-use milestone is met.
-2. Generate a VAPID key pair with `npx web-push generate-vapid-keys`. Save the public key as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and the private key as `VAPID_PRIVATE_KEY`; set `VAPID_SUBJECT` to a monitored `mailto:` address or a valid HTTPS contact URL. Keep the private key server-side.
-3. Set a random `CRON_SECRET` in the deployment environment. `vercel.json` calls `/api/cron/owner-alerts` every five minutes to send reminders until the conversation is answered. This schedule needs a Vercel plan that supports five-minute cron jobs; Vercel Hobby only supports daily runs.
-4. For WhatsApp alerts, create and approve a Meta utility template with three body parameters: alert type, customer phone, and dashboard link. Set its name in `WHATSAPP_OWNER_ALERT_TEMPLATE` and its approved language code in `WHATSAPP_OWNER_ALERT_LANGUAGE`.
-5. Sign in as a business admin, open **More → Owner alerts**, enable browser notifications on each device, set the owner's international-format WhatsApp number if needed, and choose quiet hours and the reminder interval.
-
-The app queues notifications during quiet hours. Push delivery also requires HTTPS and browser notification permission. Meta template delivery requires valid WhatsApp Business credentials for that business.
-
----
-
-## Step-by-Step Setup Guide
-
-Follow these steps in order to go from zero to a working WhatsApp AI agent.
-
-### Step 1: Create a Meta Business App
-
-1. Go to https://developers.facebook.com and log in
-2. Click **My Apps** > **Create App**
-3. Select **Business** as the app type
-4. Give it a name (e.g. "WhatsApp AI Agent") and click **Create**
-5. On the app dashboard, find **WhatsApp** and click **Set Up**
-6. You'll be assigned a test phone number and a temporary access token
-
-### Step 2: Get a Permanent Access Token
-
-The temporary token expires in 24 hours. To get a permanent one:
-
-1. Go to https://business.facebook.com/settings/system-users
-2. Click **Add** to create a new System User (Admin role)
-3. Click **Add Assets** > select your app > toggle **Full Control**
-4. Click **Generate Token** > select your app > check `whatsapp_business_messaging` and `whatsapp_business_management`
-5. Copy the token — this is your `WHATSAPP_ACCESS_TOKEN`
-
-### Step 3: Get Your Phone Number ID
-
-1. Go to https://developers.facebook.com > your app > WhatsApp > **API Setup**
-2. Under "From", you'll see your test phone number and its **Phone Number ID**
-3. Copy it — this is your `WHATSAPP_PHONE_NUMBER_ID`
-
-### Step 4: Create a Supabase Project
-
-1. Go to https://supabase.com and create a new project
-2. Once created, go to **Project Settings** > **API**
-3. Copy these values:
-   - **Project URL** -> `NEXT_PUBLIC_SUPABASE_URL`
-   - **anon public key** -> `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - **service_role secret key** -> `SUPABASE_SERVICE_ROLE_KEY`
-4. Go to **SQL Editor** and run the SQL from the "Set up the database" section above
-
-### Step 5: Get an OpenRouter API Key
-
-1. Go to https://openrouter.ai and create an account
-2. Go to https://openrouter.ai/keys and create a new API key
-3. Copy it — this is your `OPENROUTER_API_KEY`
-4. Choose a model ID for `AI_MODEL` (e.g. `anthropic/claude-sonnet-4-20250514`, `openai/gpt-4o`, `minimax/minimax-m2.5`)
-
-### Step 6: Configure the Project
-
-1. Clone this repo and install dependencies:
-   ```bash
-   git clone <repo-url>
-   cd whatsapp_claude_code
-   npm install
-   ```
-
-2. Create your `.env.local` file:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-3. Fill in all the values you collected in Steps 2-5
-
-### Step 7: Start the App
-
-```bash
-npm run dev
-```
-
-The app will start on http://localhost:3000. Open it in your browser — you should see the dashboard with an empty conversation list.
-
-### Step 8: Expose Your Local Server
-
-Meta needs a public HTTPS URL to send webhooks to. Use ngrok:
-
-```bash
-# Install ngrok if you haven't: https://ngrok.com/download
-ngrok http 3000
-```
-
-Copy the `https://` forwarding URL (e.g. `https://abc123.ngrok-free.app`).
-
-### Step 9: Configure the Webhook in Meta
-
-1. Go to https://developers.facebook.com > your app > WhatsApp > **Configuration**
-2. Under "Webhook", click **Edit**
-3. Set the **Callback URL** to: `https://your-ngrok-url.ngrok-free.app/api/webhook`
-4. Set the **Verify Token** to the same value as your `WHATSAPP_VERIFY_TOKEN` in `.env.local`
-5. Click **Verify and Save**
-6. Under "Webhook Fields", click **Manage** and subscribe to **messages**
-
-### Step 10: Add Your Phone Number to Recipients
-
-If using the Meta test phone number:
-
-1. Go to WhatsApp > API Setup
-2. Under "To", add your personal WhatsApp phone number
-3. You'll receive a verification code on WhatsApp — enter it to confirm
-
-### Step 11: Send a Test Message
-
-1. Open WhatsApp on your phone
-2. Send a message to the Meta test phone number (shown in API Setup)
-3. You should receive an AI-generated reply within a few seconds
-4. Open the dashboard at http://localhost:3000 — the conversation should appear in the sidebar
-
-### Step 12: Deploy to Production (Optional)
-
-1. Push your code to GitHub
-2. Import the project on https://vercel.com
-3. Add all your environment variables in Vercel's project settings
-4. Deploy — Vercel will give you a production URL
-5. Go back to Meta > WhatsApp > Configuration and update the webhook URL to your Vercel URL
-6. Remove the ngrok dependency — you're live!
-
-### Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| Webhook verification fails | Double-check `WHATSAPP_VERIFY_TOKEN` matches in both `.env.local` and Meta dashboard |
-| Messages received but no AI reply | Check your `OPENROUTER_API_KEY` and `AI_MODEL` are valid |
-| Dashboard shows no conversations | Make sure you're opening the correct port (check terminal output) |
-| Duplicate replies | Meta retries if your webhook doesn't respond within 5 seconds — check server logs for slow AI responses |
-| "Message failed to send" | Verify your `WHATSAPP_ACCESS_TOKEN` hasn't expired and `WHATSAPP_PHONE_NUMBER_ID` is correct |
+The dashboard currently offers English and Tamil for its translated navigation, Today screen, and filters. Other screens remain in English. Hindi is not available in this release; new translations need review by native speakers before launch.

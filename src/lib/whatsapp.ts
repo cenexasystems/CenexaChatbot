@@ -3,6 +3,8 @@ import { GRAPH_BASE } from "@/lib/graph";
 interface SendOptions {
   phoneNumberId?: string;
   accessToken?: string;
+  headerParameters?: string[];
+  buttons?: Array<{ index: number; text: string }>;
 }
 
 async function postMessage(payload: Record<string, unknown>, options: SendOptions) {
@@ -40,6 +42,16 @@ export async function sendWhatsAppTemplate(
   bodyParameters: string[],
   options: SendOptions = {}
 ) {
+  const components: Record<string, unknown>[] = [];
+  if (options.headerParameters?.length) {
+    components.push({ type: "header", parameters: options.headerParameters.map((text) => ({ type: "text", text })) });
+  }
+  if (bodyParameters.length) {
+    components.push({ type: "body", parameters: bodyParameters.map((text) => ({ type: "text", text })) });
+  }
+  for (const button of options.buttons ?? []) {
+    components.push({ type: "button", sub_type: "url", index: String(button.index), parameters: [{ type: "text", text: button.text }] });
+  }
   return postMessage(
     {
       to,
@@ -47,10 +59,7 @@ export async function sendWhatsAppTemplate(
       template: {
         name,
         language: { code: languageCode },
-        components: [{
-          type: "body",
-          parameters: bodyParameters.map((text) => ({ type: "text", text })),
-        }],
+        ...(components.length ? { components } : {}),
       },
     },
     options

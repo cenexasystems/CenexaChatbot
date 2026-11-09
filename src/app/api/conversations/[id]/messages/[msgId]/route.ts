@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess, requireStrictPermission } from "@/lib/api-auth";
 
 export async function DELETE(
   _request: NextRequest,
@@ -8,6 +8,7 @@ export async function DELETE(
   const { id, msgId } = await params;
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
+  const denied = requireStrictPermission(access, "conversation_reply"); if (denied) return denied;
   const { businessId, admin } = access;
   const { conversation, error: conversationError } = await getOwnedConversation(admin, businessId, id, "id");
   if (conversationError) {

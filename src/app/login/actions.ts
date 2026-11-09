@@ -44,7 +44,12 @@ export async function login(formData: FormData) {
       }
 
       if (!profile?.business_id) {
-        redirect("/onboard");
+        const { data: platformAdmin, error: platformError } = await adminClient.from("platform_admins").select("user_id").eq("user_id", userId).eq("disabled", false).maybeSingle();
+        if (platformError) {
+          await supabase.auth.signOut();
+          return { error: "We could not verify platform access. Please try again." };
+        }
+        redirect(platformAdmin ? "/admin" : "/onboard");
       }
       redirect("/");
     }
@@ -56,6 +61,20 @@ export async function login(formData: FormData) {
     return { error: "We could not load your business profile. Please try again." };
   }
 
+  redirect("/");
+}
+
+export async function acceptInvitePassword(formData: FormData) {
+  const password = formData.get("password") as string;
+  if (!password || password.length < 8) return { error: "Choose a password with at least 8 characters" };
+  const supabase = await createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return { error: "Your invitation link has expired. Ask your admin to send a new invitation." };
+  const adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const { data: profile } = await adminClient.from("profiles").select("status").eq("id", user.id).maybeSingle();
+  if (profile?.status !== "invited") return { error: "This invitation is no longer active. Sign in or ask your admin for help." };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
   redirect("/");
 }
 

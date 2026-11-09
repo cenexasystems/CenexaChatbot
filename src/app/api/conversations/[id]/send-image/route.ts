@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess, requireStrictPermission } from "@/lib/api-auth";
 import { sendWhatsAppImage, extractWamid } from "@/lib/whatsapp";
 import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
 
@@ -10,6 +10,7 @@ export async function POST(
   const { id } = await params;
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
+  const denied = requireStrictPermission(access, "conversation_reply"); if (denied) return denied;
   const { businessId, admin } = access;
   const body = await request.json();
   const { imageUrl, caption = "" } = body;

@@ -1,21 +1,16 @@
 "use client";
-import { Page, Roadmap } from "@/components/cx/Page";
-import { Button, EmptyState, Panel } from "@/components/cx/ui";
+import { Page } from "@/components/cx/Page";
+import { EmptyState, Panel } from "@/components/cx/ui";
+import { useDashboard } from "@/components/cx/DashboardProvider";
+import { CampaignManager } from "@/components/cx/CampaignManager";
 
 export default function CampaignsPage() {
+  const { business } = useDashboard();
+  if (business?.modules_enabled?.campaigns === true) return <CampaignManager />;
   return (
-    <Page wide section="Marketing" title="Campaigns" subtitle="Template broadcasts to customer groups" action={<Button variant="primary" icon="plus" disabled title="Coming soon">New campaign</Button>}>
+    <Page wide section="Marketing" title="Campaigns" subtitle="Template broadcasts to customer groups">
       <Panel title="Campaigns" icon="campaigns">
-        <EmptyState icon="campaigns" title="No campaigns yet" body="Campaigns are not available yet. They will appear here once enabled for your account." />
-      </Panel>
-      <Panel className="mt-5" title="Roadmap" icon="flow">
-        <Roadmap
-          items={[
-            { icon: "rupee", title: "Cost preview", body: "Audience size, Meta charge and Cenexa fee as separate lines before sending. Test send to your own number." },
-            { icon: "checks", title: "Delivery results", body: "Delivered, read, replied and paid per campaign." },
-            { icon: "link", title: "Click-to-chat links and QR", body: "Source-tagged links for your shop, Instagram and website." },
-          ]}
-        />
+        <EmptyState icon="campaigns" title="Campaigns are off for this business" body="An admin can turn on Campaigns after reviewing consent records, message limits, and the sending pause." />
       </Panel>
     </Page>
   );

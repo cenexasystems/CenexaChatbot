@@ -2,11 +2,13 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { isOwnedByBusiness, resolveTenantScope } from "@/lib/tenant-authorization";
+export { requirePermission, requireStrictPermission } from "@/lib/permissions";
 
 export type BusinessAccess = {
   businessId: string;
   userId: string;
   role: string;
+  strictRoles: boolean;
   admin: SupabaseClient;
 };
 
@@ -25,12 +27,12 @@ export async function requireBusinessAccess(): Promise<
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  let profile: { business_id: string | null; role: string | null } | null = null;
+  let profile: { business_id: string | null; role: string | null; status: string | null } | null = null;
   let profileError: unknown = null;
   if (user && !userError) {
     const result = await admin
       .from("profiles")
-      .select("business_id, role")
+      .select("business_id, role, status")
       .eq("id", user.id)
       .maybeSingle();
     profile = result.data;
@@ -42,7 +44,18 @@ export async function requireBusinessAccess(): Promise<
     return { response: Response.json({ error: scope.error }, { status: scope.status }) };
   }
 
-  return { access: { businessId: scope.businessId, userId: user!.id, role: profile!.role ?? "support", admin } };
+  if (profile?.status === "disabled") {
+    return { response: Response.json({ error: "This account is disabled" }, { status: 403 }) };
+  }
+  if (profile?.status === "invited") {
+    const { error: activationError } = await admin.from("profiles").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", user!.id).eq("business_id", scope.businessId).eq("status", "invited");
+    if (activationError) return { response: Response.json({ error: "Unable to activate your invited account" }, { status: 500 }) };
+  }
+  const { data: business, error: businessError } = await admin.from("businesses").select("strict_roles,platform_suspended").eq("id", scope.businessId).maybeSingle();
+  if (businessError || !business) return { response: Response.json({ error: "Business not found" }, { status: 404 }) };
+  if (business.platform_suspended) return { response: Response.json({ error: "This business is suspended. Contact Cenexa support." }, { status: 403 }) };
+
+  return { access: { businessId: scope.businessId, userId: user!.id, role: profile!.role ?? "support", strictRoles: business.strict_roles ?? false, admin } };
 }
 
 export async function getOwnedConversation(

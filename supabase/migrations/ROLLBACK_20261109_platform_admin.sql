@@ -1,0 +1,13 @@
+drop function if exists public.refresh_platform_usage_daily(date);
+drop function if exists public.get_platform_tenant_summary();
+drop function if exists public.platform_set_admin(uuid,text,boolean,uuid,text);
+drop function if exists public.platform_update_tenant(uuid,jsonb,uuid,text);
+drop trigger if exists platform_audit_log_no_update on public.platform_audit_log;
+drop function if exists public.reject_platform_audit_mutation();
+drop table if exists public.tenant_usage_daily;
+drop table if exists public.cron_runs;
+drop table if exists public.platform_audit_log;
+drop table if exists public.platform_admins;
+alter table public.messages drop constraint if exists messages_source_check;
+alter table public.messages add constraint messages_source_check check (source in ('customer','ai','dashboard','business_app','history','automation') or source is null);
+alter table public.businesses drop column if exists platform_suspended;

@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import { conversationNotFound, getOwnedConversation, requireBusinessAccess } from "@/lib/api-auth";
+import { conversationNotFound, getOwnedConversation, requireBusinessAccess, requireStrictPermission } from "@/lib/api-auth";
 import { extractWamid, sendWhatsAppImage } from "@/lib/whatsapp";
 import { resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
+import { enqueueAutomationForConversation } from "@/lib/automation-queue";
 
 export async function POST(
   request: NextRequest,
@@ -10,6 +11,7 @@ export async function POST(
   const { id } = await params;
   const { access, response } = await requireBusinessAccess();
   if (response) return response;
+  const denied = requireStrictPermission(access, "conversation_reply"); if (denied) return denied;
   const { businessId, admin } = access;
   const body = await request.json();
   const { imageUrl } = body; // optional — if provided, save as business QR for future use
@@ -82,6 +84,7 @@ export async function POST(
     media_type: "image",
   });
   await resolveOwnerAlertsForConversation(businessId, id, ["handoff"]);
+  await enqueueAutomationForConversation(businessId, id, "payment_reminder", `qr:${id}:${Date.now()}`);
 
   return Response.json({ success: true, qrUrl });
 }
