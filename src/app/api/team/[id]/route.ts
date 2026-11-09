@@ -3,6 +3,32 @@ import { requireModuleEnabled } from "@/lib/module-access";
 
 const TEAM_ROLES = ["admin", "support", "sales", "accounts"] as const;
 
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { access, response } = await requireBusinessAccess(); if (response) return response;
+  const denied = requirePermission(access, "team_manage"); if (denied) return denied;
+  const disabled = await requireModuleEnabled(access.admin, access.businessId, "team"); if (disabled) return disabled;
+  const { id } = await params;
+  const { data: member, error: memberError } = await access.admin.from("profiles")
+    .select("id,name,email,role,status")
+    .eq("id", id).eq("business_id", access.businessId).maybeSingle();
+  if (memberError) return Response.json({ error: "Unable to load team member" }, { status: 500 });
+  if (!member) return Response.json({ error: "Team member not found" }, { status: 404 });
+  if (member.status !== "invited") return Response.json({ error: "Only pending invitations can be resent" }, { status: 409 });
+  if (!member.email || !TEAM_ROLES.includes(member.role as typeof TEAM_ROLES[number])) return Response.json({ error: "This invitation is missing a valid email or role" }, { status: 409 });
+
+  const { data: invited, error: inviteError } = await access.admin.auth.admin.inviteUserByEmail(member.email, {
+    data: { name: member.name, role: member.role },
+    redirectTo: new URL("/auth/confirm", request.url).toString(),
+  });
+  if (inviteError || invited.user?.id !== id) {
+    return Response.json({ error: inviteError?.message ?? "Could not resend this invitation" }, { status: 409 });
+  }
+
+  const { error: updateError } = await access.admin.from("profiles").update({ invited_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id).eq("business_id", access.businessId).eq("status", "invited");
+  return Response.json({ resent: true, warning: updateError ? "The invite was sent, but its timestamp could not be updated." : undefined }, { status: 200 });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { access, response } = await requireBusinessAccess(); if (response) return response;

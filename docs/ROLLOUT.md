@@ -303,6 +303,8 @@ Set the Supabase **Invite user** email link to
 `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite` and include
 the production `/auth/confirm` URL in the Auth redirect allowlist. The route
 verifies the invite token, then asks the invited teammate to set a password.
+Admins can resend an invitation while the teammate remains in Invited status;
+the resend generates a fresh email link and updates the invitation timestamp.
 
 `strict_roles` defaults to false so existing businesses retain their current
 behavior. Admins can enable it in Settings → Team after reviewing the role
