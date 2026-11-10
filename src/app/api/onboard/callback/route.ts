@@ -18,11 +18,12 @@ export async function POST(request: NextRequest) {
     if (!payload || typeof payload !== "object") {
       return NextResponse.json({ error: "Invalid onboarding request" }, { status: 400 });
     }
-    const { code, businessName: rawBusinessName, wabaId: clientWabaId, registrationPin } = payload as {
+    const { code, businessName: rawBusinessName, wabaId: clientWabaId, registrationPin, onboardingType } = payload as {
       code?: unknown;
       businessName?: unknown;
       wabaId?: unknown;
       registrationPin?: unknown;
+      onboardingType?: unknown;
     };
 
     if (typeof code !== "string" || !code.trim()) {
@@ -31,7 +32,13 @@ export async function POST(request: NextRequest) {
     if (typeof rawBusinessName !== "string" || !rawBusinessName.trim() || rawBusinessName.trim().length > 120) {
       return NextResponse.json({ error: "Business name is required" }, { status: 400 });
     }
+    if (onboardingType !== "api" && onboardingType !== "coexistence") {
+      return NextResponse.json({ error: "Choose API number or WhatsApp Business app onboarding and try again." }, { status: 400 });
+    }
     const businessName = rawBusinessName.trim();
+    if (onboardingType === "api" && (typeof registrationPin !== "string" || !/^\d{6}$/.test(registrationPin))) {
+      return NextResponse.json({ error: "Enter the number owner's six-digit WhatsApp PIN for API setup." }, { status: 400 });
+    }
     if (registrationPin !== undefined && (typeof registrationPin !== "string" || !/^\d{6}$/.test(registrationPin))) {
       return NextResponse.json({ error: "The WhatsApp registration PIN must be six digits." }, { status: 400 });
     }
@@ -175,6 +182,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not confirm this number's WhatsApp setup type. Please try again." }, { status: 502 });
     }
     const isCoexistence = phone?.is_on_biz_app === true || status.isOnBizApp;
+    if (onboardingType === "coexistence" && !isCoexistence) {
+      return NextResponse.json({ error: "Meta did not complete WhatsApp Business app linking. Check that Coexistence is enabled for the Meta signup configuration, then restart setup." }, { status: 400 });
+    }
+    if (onboardingType === "api" && isCoexistence) {
+      return NextResponse.json({ error: "Meta identified this as a WhatsApp Business app number. Restart setup and choose Existing Business app number." }, { status: 400 });
+    }
 
     // Check workspace ownership before making any Meta-side changes.
     const { data: existingBusiness, error: existingBusinessError } = await adminClient
