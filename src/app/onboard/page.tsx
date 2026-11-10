@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 type Step = "details" | "connect" | "processing" | "success" | "error";
+type OnboardingType = "api" | "coexistence";
 
 declare global {
   interface Window {
@@ -73,6 +74,7 @@ export default function OnboardPage() {
 
   const [step, setStep] = useState<Step>("details");
   const [businessName, setBusinessName] = useState("");
+  const [onboardingType, setOnboardingType] = useState<OnboardingType | null>(null);
   const [registrationPin, setRegistrationPin] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [sdkReady, setSdkReady] = useState(false);
@@ -145,6 +147,15 @@ export default function OnboardPage() {
       );
       return;
     }
+    if (!onboardingType) {
+      setErrorMsg("Choose API number or WhatsApp Business app first.");
+      return;
+    }
+    if (onboardingType === "api" && !/^\d{6}$/.test(registrationPin)) {
+      setStep("details");
+      setErrorMsg("Enter the number owner's six-digit WhatsApp PIN for API setup.");
+      return;
+    }
 
     setStep("processing");
     setErrorMsg("");
@@ -166,7 +177,12 @@ export default function OnboardPage() {
             const res = await fetch("/api/onboard/callback", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ code, businessName, registrationPin: registrationPin || undefined }),
+              body: JSON.stringify({
+                code,
+                businessName,
+                onboardingType,
+                ...(onboardingType === "api" ? { registrationPin } : {}),
+              }),
             });
 
             const data = await res.json();
@@ -194,12 +210,12 @@ export default function OnboardPage() {
         override_default_response_type: true,
         extras: {
           setup: {},
-          featureType: "",
-          sessionInfoVersion: "2",
+          ...(onboardingType === "coexistence" ? { featureType: "whatsapp_business_app_onboarding" } : {}),
+          sessionInfoVersion: onboardingType === "coexistence" ? "3" : "2",
         },
       }
     );
-  }, [sdkReady, businessName, registrationPin]);
+  }, [sdkReady, businessName, registrationPin, onboardingType]);
 
   /* ── Render ────────────────────────────────────────────────────────────── */
   return (
@@ -275,8 +291,8 @@ export default function OnboardPage() {
               </p>
               {[
                 "A Facebook account (personal or business)",
-                "A phone number for the bot (new SIM recommended)",
-                "Access to receive an OTP on that number",
+                "A new API number, or an existing WhatsApp Business app number for Coexistence",
+                "Access to the number to complete Meta's verification or linking steps",
               ].map((item) => (
                 <div key={item} className="flex items-start gap-2.5">
                   <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -298,7 +314,7 @@ export default function OnboardPage() {
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && businessName.trim()) setStep("connect");
+                    if (e.key === "Enter" && businessName.trim() && onboardingType && (onboardingType === "coexistence" || /^\d{6}$/.test(registrationPin))) setStep("connect");
                   }}
                   placeholder="e.g. Sharma Electronics"
                   className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none transition-all text-sm"
@@ -306,32 +322,62 @@ export default function OnboardPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-2">
-                  WhatsApp two-step PIN <span className="normal-case">(API numbers only)</span>
-                </label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={registrationPin}
-                  onChange={(e) => setRegistrationPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="Leave blank for WhatsApp Business app numbers"
-                  className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none transition-all text-sm"
-                />
-                <p className="text-xs text-white/40 mt-2">
-                  This is the number owner&apos;s existing six-digit WhatsApp verification PIN. It is sent to Meta only during setup and is not saved.
-                </p>
-              </div>
+              <fieldset>
+                <legend className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-2">How is this number used?</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    aria-pressed={onboardingType === "api"}
+                    onClick={() => { setOnboardingType("api"); setErrorMsg(""); }}
+                    className={`rounded-xl border p-3 text-left transition-colors ${onboardingType === "api" ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}
+                  >
+                    <span className="block text-sm font-semibold text-white">WhatsApp Cloud API</span>
+                    <span className="block mt-1 text-xs leading-relaxed text-white/50">Connect this number directly to Cloud API. It will not keep running in the WhatsApp Business app.</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={onboardingType === "coexistence"}
+                    onClick={() => { setOnboardingType("coexistence"); setRegistrationPin(""); setErrorMsg(""); }}
+                    className={`rounded-xl border p-3 text-left transition-colors ${onboardingType === "coexistence" ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}
+                  >
+                    <span className="block text-sm font-semibold text-white">Keep using the Business app</span>
+                    <span className="block mt-1 text-xs leading-relaxed text-white/50">Keep using the number in the WhatsApp Business app while connecting it to ChatFlow.</span>
+                  </button>
+                </div>
+              </fieldset>
+
+              {onboardingType === "api" && (
+                <div>
+                  <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-2">
+                    WhatsApp two-step PIN <span className="normal-case">(API setup)</span>
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={registrationPin}
+                    onChange={(e) => { setRegistrationPin(e.target.value.replace(/\D/g, "").slice(0, 6)); setErrorMsg(""); }}
+                    placeholder="Enter the number owner's 6-digit PIN"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white placeholder-white/25 focus:outline-none transition-all text-sm"
+                  />
+                  <p className="text-xs text-white/40 mt-2">The owner chooses a six-digit two-step PIN for this API number, or enters its existing PIN if one is already set. It is sent to Meta during setup and not saved.</p>
+                </div>
+              )}
+
+              {onboardingType === "coexistence" && (
+                <p className="text-xs text-white/50">No PIN is needed here. The owner must approve the connection from their WhatsApp Business app during Meta&apos;s setup.</p>
+              )}
+
+              {errorMsg && step === "details" && <p role="alert" className="text-xs text-red-300">{errorMsg}</p>}
 
               <button
                 id="next-step-btn"
                 onClick={() => {
-                  if (!businessName.trim()) return;
+                  if (!businessName.trim() || !onboardingType || (onboardingType === "api" && !/^\d{6}$/.test(registrationPin))) return;
                   setStep("connect");
                 }}
-                disabled={!businessName.trim()}
+                disabled={!businessName.trim() || !onboardingType || (onboardingType === "api" && !/^\d{6}$/.test(registrationPin))}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98]"
               >
                 Continue →
@@ -352,7 +398,7 @@ export default function OnboardPage() {
               </h1>
               <p className="text-white/50 text-sm leading-relaxed">
                 A secure Facebook popup will open. Log in, select your Business Portfolio,
-                add your WhatsApp number, and verify with OTP. Takes about 2 minutes.
+                then follow the {onboardingType === "coexistence" ? "existing WhatsApp Business app linking" : "new API number and OTP"} steps in Meta.
               </p>
             </div>
 
@@ -368,6 +414,7 @@ export default function OnboardPage() {
               <div className="min-w-0">
                 <p className="text-[10px] text-white/30 uppercase tracking-wider">Business Name</p>
                 <p className="text-sm font-medium text-white truncate">{businessName}</p>
+                <p className="text-[10px] text-emerald-300 mt-0.5">{onboardingType === "coexistence" ? "Existing WhatsApp Business app · Coexistence" : "WhatsApp Cloud API (not Business app)"}</p>
               </div>
               <button
                 onClick={() => setStep("details")}
@@ -382,8 +429,8 @@ export default function OnboardPage() {
               {[
                 { n: "1", label: "Log in with Facebook" },
                 { n: "2", label: "Select or create Business Portfolio" },
-                { n: "3", label: "Add WhatsApp number + OTP" },
-                { n: "4", label: "Bot goes live automatically ✅" },
+                { n: "3", label: onboardingType === "coexistence" ? "Select the number already used in WhatsApp Business app and approve linking" : "Add a Cloud API number and verify it by OTP" },
+                { n: "4", label: onboardingType === "coexistence" ? "Keep using the Business app alongside ChatFlow" : "Finish API registration; the bot connects" },
               ].map((item) => (
                 <div key={item.n} className="flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center flex-shrink-0">
