@@ -329,19 +329,19 @@ export default function OnboardPage() {
                     type="button"
                     aria-pressed={onboardingType === "api"}
                     onClick={() => { setOnboardingType("api"); setErrorMsg(""); }}
-                    className={`rounded-xl border p-3 text-left transition-colors ${onboardingType === "api" ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}
+                    className={`rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5BD3] ${onboardingType === "api" ? "border-[#0B5BD3] bg-[#E8F1FD] shadow-[0_0_0_2px_rgba(11,91,211,0.15)]" : "border-[#C9D3E1] bg-white hover:border-[#0B5BD3] hover:bg-[#F7FAFF]"}`}
                   >
-                    <span className="block text-sm font-semibold text-white">WhatsApp Cloud API</span>
-                    <span className="block mt-1 text-xs leading-relaxed text-white/50">Connect this number directly to Cloud API. It will not keep running in the WhatsApp Business app.</span>
+                    <span className={`block text-sm font-semibold ${onboardingType === "api" ? "text-[#0B3B8C]" : "text-[#17263B]"}`}>WhatsApp Cloud API</span>
+                    <span className="block mt-1 text-xs leading-relaxed text-[#53627A]">Connect this number directly to Cloud API. It will not keep running in the WhatsApp Business app.</span>
                   </button>
                   <button
                     type="button"
                     aria-pressed={onboardingType === "coexistence"}
                     onClick={() => { setOnboardingType("coexistence"); setRegistrationPin(""); setErrorMsg(""); }}
-                    className={`rounded-xl border p-3 text-left transition-colors ${onboardingType === "coexistence" ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}
+                    className={`rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5BD3] ${onboardingType === "coexistence" ? "border-[#0B5BD3] bg-[#E8F1FD] shadow-[0_0_0_2px_rgba(11,91,211,0.15)]" : "border-[#C9D3E1] bg-white hover:border-[#0B5BD3] hover:bg-[#F7FAFF]"}`}
                   >
-                    <span className="block text-sm font-semibold text-white">Keep using the Business app</span>
-                    <span className="block mt-1 text-xs leading-relaxed text-white/50">Keep using the number in the WhatsApp Business app while connecting it to ChatFlow.</span>
+                    <span className={`block text-sm font-semibold ${onboardingType === "coexistence" ? "text-[#0B3B8C]" : "text-[#17263B]"}`}>Keep using the Business app</span>
+                    <span className="block mt-1 text-xs leading-relaxed text-[#53627A]">Keep using the number in the WhatsApp Business app while connecting it to ChatFlow.</span>
                   </button>
                 </div>
               </fieldset>
@@ -378,7 +378,7 @@ export default function OnboardPage() {
                   setStep("connect");
                 }}
                 disabled={!businessName.trim() || !onboardingType || (onboardingType === "api" && !/^\d{6}$/.test(registrationPin))}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98]"
+                className="w-full bg-[#0B5BD3] hover:bg-[#0A4CB3] disabled:bg-[#D9E6F5] disabled:text-[#53627A] disabled:shadow-none disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 text-sm shadow-lg shadow-[#0B5BD3]/20 hover:shadow-[#0B5BD3]/30 active:scale-[0.98]"
               >
                 Continue →
               </button>
