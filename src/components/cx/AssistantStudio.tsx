@@ -12,6 +12,8 @@ type AssistantSettings = {
   greeting_phrases: string[];
   url_rewrite_from: string | null;
   url_rewrite_to: string | null;
+  media_ai_enabled: boolean;
+  voice_transcription_configured: boolean;
 };
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -25,6 +27,8 @@ const EMPTY_SETTINGS: AssistantSettings = {
   greeting_phrases: [],
   url_rewrite_from: "",
   url_rewrite_to: "",
+  media_ai_enabled: false,
+  voice_transcription_configured: false,
 };
 
 const INPUT = "w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/20";
@@ -237,6 +241,19 @@ export function AssistantStudio() {
                     className={cx(INPUT, "resize-y leading-relaxed")}
                   />
                   <span className="block text-[10.5px] text-ink-faint mt-1">Direct requests for a person are always handed off automatically.</span>
+                </label>
+              </section>
+
+              <section className="border-t border-line pt-4">
+                <label className="flex items-start justify-between gap-4">
+                  <span>
+                    <span className={LABEL}>Voice and image understanding</span>
+                    <span className="block text-[12px] text-ink-soft">Transcribe voice notes and let the assistant answer what the customer said. If transcription is unavailable, send the conversation to a person and alert the owner.</span>
+                    <span className={cx("block text-[11px] mt-1", settings.voice_transcription_configured ? "text-emerald-700" : "text-attention")}>
+                      {settings.voice_transcription_configured ? "Voice transcription is configured." : "The app administrator must configure TRANSCRIBE_API_KEY (or OPENAI_API_KEY) and redeploy for voice understanding."}
+                    </span>
+                  </span>
+                  <input type="checkbox" checked={settings.media_ai_enabled} onChange={(event) => update("media_ai_enabled", event.currentTarget.checked)} className="mt-1 h-4 w-4 accent-accent" />
                 </label>
               </section>
 

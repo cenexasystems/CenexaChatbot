@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireBusinessAccess, requirePermission } from "@/lib/api-auth";
 
-const FIELDS = "system_prompt, welcome_message, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to";
+const FIELDS = "system_prompt, welcome_message, handoff_rules, handoff_keywords, greeting_phrases, url_rewrite_from, url_rewrite_to, media_ai_enabled";
 
 function normalizeStringList(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length > 50 || value.some((item) => typeof item !== "string")) return null;
@@ -15,7 +15,7 @@ export async function GET() {
   const { data, error } = await admin.from("businesses").select(FIELDS).eq("id", businessId).maybeSingle();
   if (error) return Response.json({ error: "Unable to load assistant settings" }, { status: 500 });
   if (!data) return Response.json({ error: "Business not found" }, { status: 404 });
-  return Response.json({ settings: data });
+  return Response.json({ settings: { ...data, voice_transcription_configured: Boolean(process.env.TRANSCRIBE_API_KEY || process.env.OPENAI_API_KEY) } });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -41,6 +41,11 @@ export async function PATCH(request: NextRequest) {
       return Response.json({ error: `${key} is too long or invalid` }, { status: 400 });
     }
     update[key] = typeof value === "string" && !value.trim() ? null : value;
+  }
+
+  if ("media_ai_enabled" in body) {
+    if (typeof body.media_ai_enabled !== "boolean") return Response.json({ error: "media_ai_enabled must be true or false" }, { status: 400 });
+    update.media_ai_enabled = body.media_ai_enabled;
   }
 
   for (const key of ["handoff_keywords", "greeting_phrases"] as const) {
@@ -87,5 +92,5 @@ export async function PATCH(request: NextRequest) {
     .maybeSingle();
   if (error) return Response.json({ error: "Unable to save assistant settings" }, { status: 500 });
   if (!data) return Response.json({ error: "Business not found" }, { status: 404 });
-  return Response.json({ settings: data });
+  return Response.json({ settings: { ...data, voice_transcription_configured: Boolean(process.env.TRANSCRIBE_API_KEY || process.env.OPENAI_API_KEY) } });
 }

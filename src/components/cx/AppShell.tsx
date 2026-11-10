@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const badgeFor = (href: string) => (href === "/inbox" ? waiting : 0);
 
   return (
-    <div className="h-dvh flex flex-col md:flex-row overflow-hidden">
+    <div className="fixed inset-0 h-dvh flex flex-col md:flex-row overflow-hidden">
       {/* Sidebar (desktop) */}
       <aside className="hidden lg:flex w-[264px] shrink-0 flex-col bg-sidebar text-white">
         <Link href="/today" className="flex items-center gap-3 px-5 h-[84px] border-b border-white/10">
