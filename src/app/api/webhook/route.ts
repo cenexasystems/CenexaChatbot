@@ -430,6 +430,18 @@ async function handleIncoming(value: any, message: any) {
     return;
   }
 
+  // A voice note must never receive the canned "team will listen" response
+  // unless it is actually routed to the team. Businesses without voice AI
+  // still get a real handoff and owner alert for audio messages.
+  if (msgType === "audio" && !isMediaAiEnabled) {
+    if (conversation.mode !== "human") {
+      await supabase.from("conversations").update({ mode: "human" }).eq("id", conversation.id);
+      await reply(HANDOFF_REPLY);
+    }
+    if (businessId) await enqueueOwnerAlert(businessId, conversation.id, "handoff", message.id);
+    return;
+  }
+
   /* ── should the AI answer at all? ──
      "human" = manual dashboard toggle.
      ai_paused_until = owner replied from WhatsApp Business app (ONLY checked when coexistence_enabled = true). */
@@ -561,6 +573,7 @@ async function handleIncoming(value: any, message: any) {
           .eq("id", messageRowId);
       } else {
         console.warn("[webhook] voice analysis skipped:", r.reason);
+        needsHuman = true;
       }
     } else {
       const r = await analyzeImage(mediaBuffer, mediaMime, text === "[image]" ? null : text, opts);
@@ -573,6 +586,9 @@ async function handleIncoming(value: any, message: any) {
       }
     }
   }
+
+  // Download failures (or missing media credentials) also need a human follow-up.
+  if (msgType === "audio" && !analysed) needsHuman = true;
 
   /* ── escalate: complaint / unreadable / ID document → a person ── */
   if (needsHuman) {
