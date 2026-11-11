@@ -55,6 +55,8 @@ function readLang(): Lang {
 }
 
 let tempId = 0;
+const SUMMARY_CACHE_TTL_MS = 15_000;
+const summaryCache = new Map<string, { data: ConversationWithLastMessage[]; savedAt: number }>();
 
 const noopSubscribe = () => () => {};
 
@@ -78,6 +80,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const convoIds = useRef(new Set<string>());
   const loading = !mounted || fetching;
   const businessId = business?.id;
+  const summaryCacheKey = businessId ? `${businessId}:${userId ?? "shared"}` : null;
   const updateBusiness = useCallback((patch: Partial<Business>) => setBusiness((current) => current ? { ...current, ...patch } : current), []);
 
   const setLang = useCallback((l: Lang) => {
@@ -122,21 +125,34 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return () => ctrl.abort();
   }, [router]);
 
-  const fetchConversations = useCallback(async (): Promise<ConversationWithLastMessage[] | null> => {
+  const fetchConversations = useCallback(async (force = false): Promise<ConversationWithLastMessage[] | null> => {
     if (DEMO_MODE || !businessId) return null;
+    if (summaryCacheKey) {
+      const cached = summaryCache.get(summaryCacheKey);
+      if (!force && cached && Date.now() - cached.savedAt < SUMMARY_CACHE_TTL_MS) return cached.data;
+    }
     const res = await fetch(`/api/conversations?business_id=${businessId}`);
     const data = await res.json().catch(() => null);
-    return Array.isArray(data) ? data : null;
-  }, [businessId]);
+    if (!Array.isArray(data)) return null;
+    if (summaryCacheKey) {
+      summaryCache.set(summaryCacheKey, { data, savedAt: Date.now() });
+      if (summaryCache.size > 20) summaryCache.delete(summaryCache.keys().next().value!);
+    }
+    return data;
+  }, [businessId, summaryCacheKey]);
 
   const refresh = useCallback(async () => {
-    const data = await fetchConversations();
+    const data = await fetchConversations(true);
     if (data) setConversations(data);
   }, [fetchConversations]);
 
   // Initial load once the business is known.
   useEffect(() => {
     let live = true;
+    if (summaryCacheKey) {
+      const cached = summaryCache.get(summaryCacheKey);
+      if (cached) setConversations(cached.data);
+    }
     fetchConversations()
       .then((data) => {
         if (live && data) setConversations(data);
@@ -145,11 +161,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [fetchConversations]);
+  }, [fetchConversations, summaryCacheKey]);
 
   const loadMessages = useCallback(async (id: string) => {
     if (DEMO_MODE) return;
-    const res = await fetch(`/api/conversations/${id}/messages?limit=100`, { cache: "no-store" });
+    const res = await fetch(`/api/conversations/${id}/messages?limit=50`, { cache: "no-store" });
     const data = await res.json().catch(() => null);
     if (!res.ok || !Array.isArray(data?.messages)) return;
     setMessages((all) => {
@@ -180,6 +196,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // ── Realtime ──
   useEffect(() => {
     if (!supabase || !businessId) return;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => void refresh(), 250);
+    };
     const channel = supabase
       .channel(`cx-${businessId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
@@ -193,7 +214,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           if (withoutTemp.some((x) => x.id === msg.id)) return m;
           return { ...m, [msg.conversation_id]: [...withoutTemp, msg] };
         });
-        refresh();
+        scheduleRefresh();
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
         const msg = payload.new as Message;
@@ -212,10 +233,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations", filter: `business_id=eq.${businessId}` },
-        () => refresh()
+        scheduleRefresh
       )
       .subscribe();
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
   }, [supabase, businessId, refresh]);
