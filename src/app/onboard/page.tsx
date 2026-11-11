@@ -71,6 +71,7 @@ function StepDots({ current }: { current: Step }) {
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export default function OnboardPage() {
   const router = useRouter();
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
 
   const [step, setStep] = useState<Step>("details");
   const [businessName, setBusinessName] = useState("");
@@ -82,18 +83,12 @@ export default function OnboardPage() {
     phoneNumberId: string;
     whatsappNumber: string | null;
   } | null>(null);
+  const visibleStep: Step = appId ? step : "error";
+  const visibleError = appId ? errorMsg : "Meta onboarding is not configured for this deployment. Please contact the Cenexa administrator.";
 
   /* ── Load Facebook SDK ─────────────────────────────────────────────────── */
   useEffect(() => {
-    // Some users might have NEXT_PUBLIC_META_APP_ID, some might just have META_APP_ID
-    // If it's not prefixed with NEXT_PUBLIC, the browser can't see it, so we must warn them.
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-
-    if (!appId) {
-      setErrorMsg("NEXT_PUBLIC_META_APP_ID is missing from .env.local. Please add it so the Facebook SDK can initialize.");
-      setStep("error");
-      return;
-    }
+    if (!appId) return;
 
     // Inject FB async init
     window.fbAsyncInit = function () {
@@ -116,9 +111,9 @@ export default function OnboardPage() {
       document.body.appendChild(script);
     } else {
       // Script already loaded (hot reload etc.)
-      setSdkReady(true);
+      window.setTimeout(() => setSdkReady(Boolean(window.FB)), 0);
     }
-  }, []);
+  }, [appId]);
 
   /* ── Check if already onboarded ───────────────────────────────────────── */
   useEffect(() => {
@@ -262,14 +257,14 @@ export default function OnboardPage() {
       {/* Main card */}
       <div className="w-full max-w-lg relative z-10">
         {/* Step indicator */}
-        {step !== "error" && (
+        {visibleStep !== "error" && (
           <div className="flex justify-center mb-8">
-            <StepDots current={step} />
+            <StepDots current={visibleStep} />
           </div>
         )}
 
         {/* ── STEP 1: Business Details ───────────────────────────────────── */}
-        {step === "details" && (
+        {visibleStep === "details" && (
           <div className="bg-[#111111] border border-white/[0.07] rounded-3xl p-8 shadow-2xl shadow-black/60 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="mb-8">
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-5 text-emerald-400">
@@ -387,7 +382,7 @@ export default function OnboardPage() {
         )}
 
         {/* ── STEP 2: Connect ────────────────────────────────────────────── */}
-        {step === "connect" && (
+        {visibleStep === "connect" && (
           <div className="bg-[#111111] border border-white/[0.07] rounded-3xl p-8 shadow-2xl shadow-black/60 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="mb-8">
               <div className="w-14 h-14 rounded-2xl bg-[#1877F2]/10 border border-[#1877F2]/20 flex items-center justify-center mb-5 text-[#1877F2]">
@@ -480,7 +475,7 @@ export default function OnboardPage() {
         )}
 
         {/* ── STEP 3: Processing ─────────────────────────────────────────── */}
-        {step === "processing" && (
+        {visibleStep === "processing" && (
           <div className="bg-[#111111] border border-white/[0.07] rounded-3xl p-8 shadow-2xl shadow-black/60 animate-in fade-in duration-300 text-center">
             <div className="flex flex-col items-center gap-6 py-6">
               {/* Animated spinner ring */}
@@ -518,7 +513,7 @@ export default function OnboardPage() {
         )}
 
         {/* ── STEP 4: Success ────────────────────────────────────────────── */}
-        {step === "success" && (
+        {visibleStep === "success" && (
           <div className="bg-[#111111] border border-white/[0.07] rounded-3xl p-8 shadow-2xl shadow-black/60 animate-in fade-in zoom-in-95 duration-500 text-center">
             <div className="flex flex-col items-center gap-5 py-4">
               {/* Success icon */}
@@ -580,7 +575,7 @@ export default function OnboardPage() {
         )}
 
         {/* ── ERROR State ───────────────────────────────────────────────── */}
-        {step === "error" && (
+        {visibleStep === "error" && (
           <div className="bg-[#111111] border border-red-500/20 rounded-3xl p-8 shadow-2xl shadow-black/60 animate-in fade-in duration-300 text-center">
             <div className="flex flex-col items-center gap-5 py-4">
               <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
@@ -592,7 +587,7 @@ export default function OnboardPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-                <p className="text-sm text-red-400/80 leading-relaxed">{errorMsg}</p>
+                <p className="text-sm text-red-400/80 leading-relaxed">{visibleError}</p>
               </div>
 
               {/* Common errors helper */}
@@ -612,7 +607,7 @@ export default function OnboardPage() {
                 ))}
               </div>
 
-              <div className="flex gap-3 w-full">
+              {appId && <div className="flex gap-3 w-full">
                 <button
                   onClick={() => { setStep("connect"); setErrorMsg(""); }}
                   className="flex-1 bg-white/[0.06] hover:bg-white/[0.1] text-white/70 hover:text-white font-medium py-3 rounded-xl transition-all text-sm"
@@ -627,7 +622,7 @@ export default function OnboardPage() {
                 >
                   Retry Popup
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         )}

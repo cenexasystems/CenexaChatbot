@@ -11,10 +11,3 @@ export function getSupabase(): SupabaseClient {
   }
   return _supabase;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_, prop) {
-    return (getSupabase() as any)[prop];
-  },
-});

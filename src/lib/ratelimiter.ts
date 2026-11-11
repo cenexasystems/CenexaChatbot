@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase";
+import type { Conversation } from "@/lib/types";
 
 const LIMITS = {
     hour: 30,
@@ -12,7 +13,7 @@ const LIMIT_MESSAGES = {
     month: "Monthly limit reached! Please contact us directly at +91 99949 81576 — we'd love to help you. 🙏",
 }
 
-export async function checkAndUpdateRateLimit(conversationId: string, conversation: any): Promise<{ allowed: boolean; message?: string }> {
+export async function checkAndUpdateRateLimit(conversationId: string, conversation: Pick<Conversation, "hour_reset_at" | "day_reset_at" | "month_reset_at" | "msg_count_hour" | "msg_count_day" | "msg_count_month">): Promise<{ allowed: boolean; message?: string }> {
     const now = new Date()
 
     const hourlyCount = (now.getTime() - new Date(conversation.hour_reset_at).getTime()) > 3600000
@@ -28,7 +29,7 @@ export async function checkAndUpdateRateLimit(conversationId: string, conversati
     if (dailyCount >= LIMITS.day) return { allowed: false, message: LIMIT_MESSAGES.day }
     if (monthlyCount >= LIMITS.month) return { allowed: false, message: LIMIT_MESSAGES.month }
 
-    await supabase.from("conversations").update({
+    await getSupabase().from("conversations").update({
         msg_count_hour: hourlyCount + 1,
         msg_count_day: dailyCount + 1,
         msg_count_month: monthlyCount + 1,

@@ -19,6 +19,7 @@ type Ctx = {
   updateBusiness: (patch: Partial<Business>) => void;
   loading: boolean;
   error: string | null;
+  conversationError: string | null;
   conversations: ConversationWithLastMessage[];
   messages: Record<string, Message[] | undefined>;
   messagePages: Record<string, { hasMore: boolean; cursor: string | null }>;
@@ -73,6 +74,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState(DEMO_MODE ? "admin" : "support");
   const [fetching, setFetching] = useState(!DEMO_MODE);
   const [error, setError] = useState<string | null>(null);
+  const [conversationError, setConversationError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationWithLastMessage[]>(demoData?.conversations ?? []);
   const [messages, setMessages] = useState<Record<string, Message[] | undefined>>(demoData?.messages ?? {});
   const [messagePages, setMessagePages] = useState<Record<string, { hasMore: boolean; cursor: string | null }>>({});
@@ -134,7 +136,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
     const res = await fetch(`/api/conversations?business_id=${businessId}`);
     const data = await res.json().catch(() => null);
-    if (!Array.isArray(data)) return null;
+    if (!res.ok) throw new Error(data?.error ?? `Could not load conversations (${res.status})`);
+    if (!Array.isArray(data)) throw new Error("The inbox returned an unexpected response. Please retry.");
     if (summaryCacheKey) {
       summaryCache.set(summaryCacheKey, { data, savedAt: Date.now() });
       if (summaryCache.size > 20) summaryCache.delete(summaryCache.keys().next().value!);
@@ -143,22 +146,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [businessId, summaryCacheKey]);
 
   const refresh = useCallback(async () => {
-    const data = await fetchConversations(true);
-    if (data) setConversations(data);
+    try {
+      const data = await fetchConversations(true);
+      if (data) {
+        setConversations(data);
+        setConversationError(null);
+      }
+    } catch (cause) {
+      setConversationError(cause instanceof Error ? cause.message : "Could not refresh conversations");
+    }
   }, [fetchConversations]);
 
   // Initial load once the business is known.
   useEffect(() => {
     let live = true;
-    if (summaryCacheKey) {
-      const cached = summaryCache.get(summaryCacheKey);
-      if (cached) setConversations(cached.data);
-    }
     fetchConversations()
       .then((data) => {
-        if (live && data) setConversations(data);
+        if (live && data) {
+          setConversations(data);
+          setConversationError(null);
+        }
       })
-      .catch(() => {});
+      .catch((cause) => {
+        if (live) setConversationError(cause instanceof Error ? cause.message : "Could not load conversations");
+      });
     return () => {
       live = false;
     };
@@ -433,6 +444,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     updateBusiness,
     loading,
     error,
+    conversationError,
     conversations,
     messages,
     messagePages,

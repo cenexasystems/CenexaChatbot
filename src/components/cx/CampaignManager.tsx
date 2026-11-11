@@ -21,6 +21,7 @@ export function CampaignManager() {
   const [estimate, setEstimate] = useState<Record<string, number | string> | null>(null);
   const [loading, setLoading] = useState(!demo);
   const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [openCampaign, setOpenCampaign] = useState<Record<string, unknown> | null>(null);
@@ -77,9 +78,15 @@ export function CampaignManager() {
   }
 
   async function testSend() {
-    const response = await fetch("/api/campaigns/test-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, variables }) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) setError(data.error ?? "Test send failed"); else setNotice(data.message);
+    if (testBusy || !templateId || demo || !canManage) return;
+    setTestBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/campaigns/test-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, variables }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Test send failed");
+      setNotice(data.message ?? "Test message sent to the business number.");
+    } catch (e) { setError((e as Error).message || "Test send failed"); }
+    finally { setTestBusy(false); }
   }
   async function toggleSendingPause() {
     const response = await fetch("/api/campaigns/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paused: !sendingPaused }) });
@@ -97,15 +104,14 @@ export function CampaignManager() {
   return <Page wide section="Marketing" title="Campaigns" subtitle="Consent-based WhatsApp broadcasts">
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-danger-tint p-3 text-[13px] text-danger">{error}</p>}{notice && <p role="status" className="rounded-lg bg-surface p-3 text-[13px]">{notice}</p>}
-      {!canManage && <p className="rounded-lg bg-canvas p-3 text-[12px] text-ink-soft">Campaign management is restricted to business admins.</p>}
-      <Panel title="New campaign" icon="campaigns" action={canManage ? <Button size="sm" variant={sendingPaused ? "primary" : "danger"} onClick={toggleSendingPause}>{sendingPaused ? "Resume all sends" : "Pause all sends"}</Button> : null}><div className="p-4 space-y-3">
+      {!canManage && !demo ? <Panel title="New campaign" icon="campaigns"><p className="p-4 text-[13px] text-ink-soft">Campaign creation, test sends, and sending controls are restricted to business admins. You can still review campaign history and recipients.</p></Panel> : <Panel title="New campaign" icon="campaigns" action={canManage ? <Button size="sm" variant={sendingPaused ? "primary" : "danger"} onClick={toggleSendingPause}>{sendingPaused ? "Resume all sends" : "Pause all sends"}</Button> : null}><div className="p-4 space-y-3">
         <label className="block text-[12px] font-semibold">Campaign name<input className={`${field} mt-1`} value={name} onChange={(e) => setName(e.target.value)} maxLength={100} /></label>
         <div className="grid sm:grid-cols-2 gap-3"><label className="text-[12px] font-semibold">Approved template<select className={`${field} mt-1`} value={templateId} onChange={(e) => { const value = e.target.value; setTemplateId(value); const template = templates.find((item) => item.id === value); setVariables(Array.from({ length: Math.max(0, template ? templateVariableCount(template.body) : 0) }, () => "")); }}><option value="">Choose template</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.category}</option>)}</select></label><label className="text-[12px] font-semibold">Audience group<select className={`${field} mt-1`} value={groupId} onChange={(e) => setGroupId(e.target.value)}><option value="">All opted-in contacts</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div>
         {variables.map((value, i) => <label key={i} className="block text-[12px]">Template value for {`{{${i + 1}}}`}<input className={`${field} mt-1`} value={value} onChange={(e) => setVariables((current) => current.map((item, j) => i === j ? e.target.value : item))} placeholder={i === 0 ? "Contact name" : "Shared campaign value"} /></label>)}
         {estimate && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl bg-canvas p-3 text-[12px]"><p>Eligible: <strong>{estimate.count}</strong></p><p>Skipped: <strong>{estimate.skipped}</strong></p><p>Meta estimate: <strong>₹{estimate.metaCostInr}</strong></p><p>Cenexa fee: <strong>₹{estimate.cenexaFeeInr}</strong></p><p className="col-span-2 sm:col-span-4">Estimated total ₹{estimate.totalInr} · rates as of {estimate.asOf}</p></div>}
-        {canManage && <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" onClick={testSend} disabled={!templateId || demo}>Test send to business number</Button><Button variant="secondary" onClick={() => create(false)} disabled={busy || !name || !templateId || demo}>Save draft</Button><Button onClick={() => create(true)} disabled={busy || !name || !templateId || !estimate || Number(estimate.count) === 0 || demo}>{busy ? "Preparing…" : "Confirm and queue"}</Button></div>}
+        {canManage && <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" onClick={testSend} disabled={testBusy || !templateId || demo}>{testBusy ? "Sending test…" : "Test send to business number"}</Button><Button variant="secondary" onClick={() => create(false)} disabled={busy || !name || !templateId || demo}>Save draft</Button><Button onClick={() => create(true)} disabled={busy || !name || !templateId || !estimate || Number(estimate.count) === 0 || demo}>{busy ? "Preparing…" : "Confirm and queue"}</Button></div>}
         <p className="text-[11px] text-ink-faint">Cost is an estimate only. It does not debit a balance. Only contacts with recorded opt-in are eligible.</p>
-      </div></Panel>
+      </div></Panel>}
       <Panel title="Campaign history" icon="history">{loading ? <div className="p-8 flex justify-center"><Spinner /></div> : campaigns.length ? <ul className="divide-y divide-line">{campaigns.map((campaign) => <li key={campaign.id} className="flex items-center gap-3 p-4"><button className="flex-1 text-left" onClick={() => void viewCampaign(campaign.id)}><span className="block text-[13px] font-semibold">{campaign.name}</span><span className="text-[11px] text-ink-faint">{campaign.status} · {campaign.estimate?.recipientCount ?? 0} recipients · ₹{campaign.estimate?.totalInr ?? 0} estimate</span></button>{canManage && campaign.status === "sending" && <Button size="sm" variant="secondary" onClick={() => campaignAction(campaign.id, "pause")}>Pause</Button>}{canManage && campaign.status === "paused" && <Button size="sm" variant="secondary" onClick={() => campaignAction(campaign.id, "resume")}>Resume</Button>}{canManage && ["draft", "sending", "paused", "scheduled"].includes(campaign.status) && <Button size="sm" variant="danger" onClick={() => campaignAction(campaign.id, "cancel")}>Cancel</Button>}</li>)}</ul> : <EmptyState icon="campaigns" title="No campaigns yet" body="Create a campaign above using an approved template." />}</Panel>
       {openCampaign && <Panel title={`Recipients · ${String((openCampaign.campaign as Campaign)?.name ?? "Campaign")}`} icon="checks" action={<Button size="sm" variant="ghost" onClick={() => setOpenCampaign(null)}>Close</Button>}><div className="p-4"><div className="flex flex-wrap gap-3 text-[11px] mb-3">{Object.entries((openCampaign.counts as Record<string, number>) ?? {}).map(([key, val]) => <span key={key}>{key}: <strong>{val}</strong></span>)}</div><div className="max-h-72 overflow-auto"><table className="w-full text-[11px]"><tbody>{((openCampaign.recipients as Array<Record<string, string>>) ?? []).map((row) => <tr key={row.id} className="border-t border-line"><td className="p-2 font-mono">{row.phone}</td><td className="p-2">{row.status}</td><td className="p-2 text-danger">{row.skip_reason ?? row.error_code ?? ""}</td></tr>)}</tbody></table></div></div></Panel>}
     </div>

@@ -33,7 +33,7 @@ const EMPTY: Record<InboxFilter, { title: string; body: string }> = {
 };
 
 export function ConversationList({ selectedId }: { selectedId: string | null }) {
-  const { conversations, now, t, userId, role } = useDashboard();
+  const { conversations, now, t, userId, role, conversationError, refresh } = useDashboard();
   const router = useRouter();
   const params = useSearchParams();
   const filter = parseFilter(params.get("filter"));
@@ -101,7 +101,13 @@ export function ConversationList({ selectedId }: { selectedId: string | null }) 
       {userId && <div className="px-4 pt-2"><button type="button" aria-pressed={mine} onClick={() => router.push(`/inbox${filter === "all" ? "" : `?filter=${filter}`}${mine ? "" : `${filter === "all" ? "?" : "&"}mine=1`}`)} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${mine ? "border-brand bg-brand text-white" : "border-line text-ink-soft hover:bg-canvas"}`}>Mine</button></div>}
 
       <div className="flex-1 overflow-y-auto">
-        {list.length === 0 ? (
+        {conversationError ? (
+          <div className="m-4 rounded-xl border border-danger/20 bg-danger-tint p-4" role="alert">
+            <p className="text-[13px] font-semibold text-danger">Could not load conversations</p>
+            <p className="mt-1 text-[12px] text-ink-soft">{conversationError}</p>
+            <button type="button" onClick={() => void refresh()} className="mt-3 rounded-lg border border-line-strong bg-surface px-3 py-2 text-[12px] font-semibold hover:bg-canvas">Retry</button>
+          </div>
+        ) : list.length === 0 ? (
           query ? (
             <EmptyState icon="search" title="No matches" body={`Nothing matches "${query}".`} />
           ) : (
