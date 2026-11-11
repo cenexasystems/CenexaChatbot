@@ -73,7 +73,21 @@ export async function POST(
   });
   if (!result.ok) {
     const status = result.reason === "not_configured" ? 503 : result.reason === "too_large" ? 413 : 422;
-    return Response.json({ error: result.reason === "not_configured" ? "Voice transcription is not configured on the server." : "Could not transcribe this voice note. Please try again." }, { status });
+    if (result.reason === "failed") {
+      const providerStatus = result.providerStatus;
+      const providerCode = result.providerCode?.toLowerCase();
+      if (providerStatus === 401 || providerCode === "invalid_api_key") {
+        return Response.json({ error: "OpenAI rejected TRANSCRIBE_API_KEY. Check that it is a valid OpenAI API key saved for this Vercel environment, then redeploy." }, { status: 502 });
+      }
+      if (providerStatus === 429 || providerCode === "insufficient_quota") {
+        return Response.json({ error: "OpenAI rejected transcription because of a quota or rate limit. Check API billing, credits, and usage limits for the key’s project." }, { status: 502 });
+      }
+      if (providerStatus === 403) {
+        return Response.json({ error: "OpenAI denied transcription for this API project. Check the key’s project permissions and API access." }, { status: 502 });
+      }
+      return Response.json({ error: `The transcription provider failed${providerStatus ? ` (HTTP ${providerStatus})` : ""}. Check the Vercel function log for the provider error.` }, { status: 502 });
+    }
+    return Response.json({ error: result.reason === "not_configured" ? "Voice transcription is not configured on the server." : result.reason === "too_large" ? "This voice recording is too large to transcribe." : "The voice recording could not be understood. Try sending it again." }, { status });
   }
 
   const { error: updateError } = await access.admin
