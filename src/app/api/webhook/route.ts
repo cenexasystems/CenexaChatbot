@@ -5,7 +5,7 @@ import { sendWhatsAppMessage, extractWamid } from "@/lib/whatsapp";
 import { getAIResponse } from "@/lib/ai";
 import { checkAndUpdateRateLimit } from "@/lib/ratelimiter";
 import { processAndStoreMedia } from "@/lib/media";
-import { analyzeImage, analyzeVoiceNote, describeMediaForAI } from "@/lib/media-ai";
+import { analyzeImage, analyzeVoiceNote, describeMediaForAI, type ImageAnalysis } from "@/lib/media-ai";
 import { getSupabase } from "@/lib/supabase";
 import { parseDeliveryStatusEvent } from "@/lib/delivery-status";
 import { enqueueOwnerAlert, resolveOwnerAlertsForConversation } from "@/lib/owner-alerts";
@@ -250,7 +250,7 @@ function cannedMediaReply(msgType: string, isPayment: boolean): string {
   switch (msgType) {
     case "image":
       return isPayment
-        ? "Thank you for the payment screenshot! 🙏 Our team will verify and confirm shortly 💛"
+        ? "Thanks for sending your payment screenshot. Our team will check it against the payment account and confirm here. A screenshot alone does not confirm payment."
         : "Thank you for sending! 📩 We have received your image. Our team will get back to you shortly 💛";
     case "audio":
       return "Thank you for your voice note! 🎤 Our team will listen and get back to you shortly 💛";
@@ -261,6 +261,12 @@ function cannedMediaReply(msgType: string, isPayment: boolean): string {
     default:
       return "Thank you for sharing your file. Our team will get back to you shortly 💛";
   }
+}
+
+function isPaymentImage(analysis: ImageAnalysis): boolean {
+  if (analysis.category === "payment_screenshot") return true;
+  if (analysis.payment && [analysis.payment.amount, analysis.payment.transaction_id, analysis.payment.date, analysis.payment.payee].some((value) => typeof value === "string" && value.trim())) return true;
+  return false;
 }
 
 const HANDOFF_REPLY =
@@ -323,18 +329,13 @@ async function handleIncoming(value: any, message: any) {
       mediaType = stored.mediaType as MediaType;
       mediaBuffer = stored.buffer;
       mediaMime = stored.mimeType;
-      // Only treat as a payment screenshot if our side asked for payment first.
-      if (mediaType === "image" && conversation.payment_qr_sent) {
-        isPaymentScreenshot = true;
-        await supabase
-          .from("conversations")
-          .update({ payment_status: "pending", payment_qr_sent: false })
-          .eq("id", conversation.id);
-      }
     }
   }
   // Download failed (or no token): still record what kind of media it was.
   if (mediaId && !mediaType) mediaType = (msgType === "sticker" ? "sticker" : msgType) as MediaType;
+  const paymentWasRequested = mediaType === "image" && conversation.payment_qr_sent === true;
+  // Without image analysis, the customer sending a picture immediately after the requested payment proof is the review signal.
+  if (paymentWasRequested && !isMediaAiEnabled) isPaymentScreenshot = true;
 
   /* ── store the customer's message (dedupes on wamid) ── */
   const storedText = isPaymentScreenshot && text === "[image]" ? "[Payment Screenshot]" : text;
@@ -357,6 +358,9 @@ async function handleIncoming(value: any, message: any) {
   const messageRowId: string | null = inserted?.id ?? null;
 
   await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation.id);
+  if (isPaymentScreenshot) {
+    await supabase.from("conversations").update({ payment_status: "pending", payment_amount: null, payment_qr_sent: false }).eq("id", conversation.id);
+  }
 
   // Contact writes are opt-in per tenant; with the flag off, legacy webhook behavior is preserved.
   let contactId: string | null = null;
@@ -411,6 +415,22 @@ async function handleIncoming(value: any, message: any) {
     return result;
   };
 
+  const markPaymentScreenshot = async () => {
+    if (isPaymentScreenshot) return;
+    isPaymentScreenshot = true;
+    if (messageRowId) {
+      await supabase.from("messages").update({ is_payment_screenshot: true }).eq("id", messageRowId);
+    }
+    await supabase
+      .from("conversations")
+      .update({ payment_status: "pending", payment_amount: null, payment_qr_sent: false, updated_at: new Date().toISOString() })
+      .eq("id", conversation.id);
+    if (businessId) {
+      await recordContactActivity(supabase, businessId, conversation.id, "payment_pending");
+      await enqueueOwnerAlert(businessId, conversation.id, "payment", message.id);
+    }
+  };
+
   if (isPaymentScreenshot && businessId) {
     await enqueueOwnerAlert(businessId, conversation.id, "payment", message.id);
   }
@@ -434,6 +454,21 @@ async function handleIncoming(value: any, message: any) {
   // unless it is actually routed to the team. Businesses without voice AI
   // still get a real handoff and owner alert for audio messages.
   if (msgType === "audio" && !isMediaAiEnabled) {
+    if (conversation.mode !== "human") {
+      await supabase.from("conversations").update({ mode: "human" }).eq("id", conversation.id);
+      await reply(HANDOFF_REPLY);
+    }
+    if (businessId) await enqueueOwnerAlert(businessId, conversation.id, "handoff", message.id);
+    return;
+  }
+
+  // Image understanding is opt-in per business. If it is off, don't promise the
+  // team will inspect a photo while leaving the chat in AI mode.
+  if (msgType === "image" && !isMediaAiEnabled) {
+    if (isPaymentScreenshot) {
+      await reply(cannedMediaReply("image", true));
+      return;
+    }
     if (conversation.mode !== "human") {
       await supabase.from("conversations").update({ mode: "human" }).eq("id", conversation.id);
       await reply(HANDOFF_REPLY);
@@ -566,7 +601,7 @@ async function handleIncoming(value: any, message: any) {
       const r = await analyzeVoiceNote(mediaBuffer, mediaMime, opts);
       if (r.ok) {
         analysed = true;
-        needsHuman = r.analysis.needs_human;
+        needsHuman = r.analysis.needs_human || isPersonHandoffRequest(r.analysis.transcript, biz?.handoff_keywords ?? []);
         await supabase
           .from("messages")
           .update({ transcript: r.analysis.transcript, media_analysis: r.analysis })
@@ -581,6 +616,7 @@ async function handleIncoming(value: any, message: any) {
         analysed = true;
         needsHuman = r.analysis.needs_human;
         await supabase.from("messages").update({ media_analysis: r.analysis }).eq("id", messageRowId);
+        if (isPaymentImage(r.analysis)) await markPaymentScreenshot();
       } else {
         console.warn("[webhook] image analysis skipped:", r.reason);
       }
@@ -589,6 +625,15 @@ async function handleIncoming(value: any, message: any) {
 
   // Download failures (or missing media credentials) also need a human follow-up.
   if (msgType === "audio" && !analysed) needsHuman = true;
+  if (msgType === "image" && !analysed && paymentWasRequested) await markPaymentScreenshot();
+  if (msgType === "image" && !analysed && !isPaymentScreenshot) needsHuman = true;
+
+  // Payment screenshots always go to the payment review queue. The model may
+  // read visible fields, but only a person checks the bank/UPI account.
+  if (msgType === "image" && isPaymentScreenshot) {
+    await reply(cannedMediaReply("image", true));
+    return;
+  }
 
   /* ── escalate: complaint / unreadable / ID document → a person ── */
   if (needsHuman) {
@@ -622,15 +667,13 @@ async function handleIncoming(value: any, message: any) {
 
   /* ── first-ever message → welcome ── */
   if (conversation.is_first_message) {
-    const welcomeMsg = welcomeMessage ?? `Hey! 👋 I'm your AI assistant. How can I help you today? 😊`;
-    await reply(welcomeMsg);
-    await supabase
-      .from("conversations")
-      .update({ is_first_message: false, msg_count_hour: 1, msg_count_day: 1, msg_count_month: 1 })
-      .eq("id", conversation.id);
-
-    const isJustGreeting = isConfiguredGreeting(text, biz?.greeting_phrases);
-    if (isJustGreeting) return;
+    await supabase.from("conversations").update({ is_first_message: false, msg_count_hour: 1, msg_count_day: 1, msg_count_month: 1 }).eq("id", conversation.id);
+    if (msgType === "text") {
+      const welcomeMsg = welcomeMessage ?? `Hey! 👋 I'm your AI assistant. How can I help you today? 😊`;
+      await reply(welcomeMsg);
+      const isJustGreeting = isConfiguredGreeting(text, biz?.greeting_phrases);
+      if (isJustGreeting) return;
+    }
   }
 
   /* ── rate limits ── */

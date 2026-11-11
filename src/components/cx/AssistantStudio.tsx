@@ -248,7 +248,7 @@ export function AssistantStudio() {
                 <label className="flex items-start justify-between gap-4">
                   <span>
                     <span className={LABEL}>Voice and image understanding</span>
-                    <span className="block text-[12px] text-ink-soft">Transcribe voice notes and let the assistant answer what the customer said. If transcription is unavailable, send the conversation to a person and alert the owner.</span>
+                    <span className="block text-[12px] text-ink-soft">Transcribe voice notes so the assistant can answer the message itself, including Tamil, English, and Tanglish. If transcription is unavailable, send the conversation to a person and alert the owner. For mixed-language voice notes, leave TRANSCRIBE_LANGUAGE unset.</span>
                     <span className={cx("block text-[11px] mt-1", settings.voice_transcription_configured ? "text-emerald-700" : "text-attention")}>
                       {settings.voice_transcription_configured ? "Voice transcription is configured." : "The app administrator must configure TRANSCRIBE_API_KEY (or OPENAI_API_KEY) and redeploy for voice understanding."}
                     </span>

@@ -247,7 +247,8 @@ Return ONLY a JSON object:
   "payment": null, or for payment/UPI/bank screenshots: {"amount": "...", "currency": "...", "transaction_id": "...", "status": "success|failed|pending|unknown", "date": "...", "payee": "..."} using null for anything not clearly visible,
   "confidence": "low | medium | high",
   "needs_human": true if the image is an ID/Aadhaar/PAN/bank card, is blurry or unreadable, is sensitive, offensive or unclear what the customer wants; otherwise false
-}`;
+}
+Classify a visible bank, UPI, or wallet transaction receipt/confirmation as payment_screenshot even if the bot did not recently send a QR code or request proof. A payment-looking screenshot is only evidence to route for human checking; never treat it as proof that funds reached the business. If the image is an unrelated app screen or chat, use chat_screenshot or other instead.`;
 
 export async function analyzeImage(
   buffer: Buffer,
