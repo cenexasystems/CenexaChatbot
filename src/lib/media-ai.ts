@@ -64,7 +64,7 @@ export interface ImageAnalysis {
 
 export type VoiceResult =
   | { ok: true; analysis: VoiceAnalysis }
-  | { ok: false; reason: "not_configured" | "too_large" | "empty" | "failed" };
+  | { ok: false; reason: "not_configured" | "too_large" | "empty" | "failed"; providerStatus?: number; providerCode?: string };
 
 export type ImageResult =
   | { ok: true; analysis: ImageAnalysis }
@@ -178,8 +178,11 @@ export async function analyzeVoiceNote(
   try {
     transcript = await transcribe(buffer, mimeType);
   } catch (err) {
-    console.error("[media-ai] transcription failed:", err instanceof Error ? err.message : err);
-    return { ok: false, reason: "failed" };
+    const providerError = err as { status?: unknown; code?: unknown; message?: unknown };
+    const providerStatus = typeof providerError.status === "number" ? providerError.status : undefined;
+    const providerCode = typeof providerError.code === "string" ? providerError.code : undefined;
+    console.error("[media-ai] transcription failed:", { status: providerStatus, code: providerCode, message: providerError.message });
+    return { ok: false, reason: "failed", providerStatus, providerCode };
   }
   // Speech models sometimes emit a stray word for silence/noise.
   if (!transcript || transcript.replace(/[^\p{L}\p{N}]/gu, "").length < 2) {
