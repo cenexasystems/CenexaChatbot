@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import QRCode from "qrcode";
 import { useDashboard } from "@/components/cx/DashboardProvider";
 import { Page } from "@/components/cx/Page";
@@ -8,9 +8,14 @@ import { Button, EmptyState, Panel, Spinner, Status } from "@/components/cx/ui";
 import { buildClickToChatUrl } from "@/lib/integrations";
 
 type LinkRow = { id: string; label: string; source_code: string; prefilled_text: string; created_at: string };
+type GoogleConnection = { google_email: string | null; spreadsheet_id: string | null; worksheet_title: string; sync_enabled: boolean; last_synced_at: string | null; last_error: string | null };
+
+const subscribeGoogleResult = (onChange: () => void) => { window.addEventListener("popstate", onChange); return () => window.removeEventListener("popstate", onChange); };
+const getGoogleResult = () => new URLSearchParams(window.location.search).get("google");
 
 export function IntegrationsManager() {
   const { business, demo, role } = useDashboard();
+  const googleResult = useSyncExternalStore(subscribeGoogleResult, getGoogleResult, () => null);
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(!demo);
@@ -21,6 +26,12 @@ export function IntegrationsManager() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [moduleEnabled, setModuleEnabled] = useState(business?.modules_enabled?.integrations === true);
+  const [google, setGoogle] = useState<GoogleConnection | null>(null);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [worksheetTitle, setWorksheetTitle] = useState("Cenexa Contacts");
+  const [autoSync, setAutoSync] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
     if (demo) return;
@@ -34,6 +45,37 @@ export function IntegrationsManager() {
     }).catch(() => { if (active) { setError("Unable to load integrations"); setLoading(false); } });
     return () => { active = false; };
   }, [demo]);
+
+  useEffect(() => {
+    if (demo || role !== "admin" || !moduleEnabled) return;
+    let active = true;
+    void fetch("/api/integrations/google", { cache: "no-store" }).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!active) return;
+      if (!response.ok) { setError(body.error ?? "Unable to load Google Sheets settings"); return; }
+      setGoogle(body.connection ?? null);
+      setGoogleConfigured(body.oauthConfigured === true);
+      if (body.connection) {
+        setSheetUrl(body.connection.spreadsheet_id ? `https://docs.google.com/spreadsheets/d/${body.connection.spreadsheet_id}/edit` : "");
+        setWorksheetTitle(body.connection.worksheet_title || "Cenexa Contacts");
+        setAutoSync(body.connection.sync_enabled === true);
+      }
+    }).catch(() => { if (active) setError("Unable to load Google Sheets settings"); });
+    return () => { active = false; };
+  }, [demo, role, moduleEnabled]);
+
+  const googleMessages: Record<string, string> = {
+    connected: "Google account connected. Add a spreadsheet URL to finish setup.",
+    cancelled: "Google account connection was cancelled.",
+    invalid_state: "Google connection could not be verified. Please try again.",
+    token_error: "Google did not return an offline access token. Try connecting again.",
+    save_error: "Google connected, but ChatFlow could not save the connection.",
+    connect_failed: "Could not connect Google. Please try again.",
+    admin_required: "Only a business admin can connect Google Sheets.",
+    module_disabled: "Enable the Integrations module before connecting Google Sheets.",
+    config_error: "Google OAuth is not configured for this deployment.",
+  };
+  const googleNotice = googleResult ? googleMessages[googleResult] : "";
 
   const websiteSnippet = useMemo(() => {
     const first = links[0];
@@ -66,6 +108,41 @@ export function IntegrationsManager() {
     else { setModuleEnabled(enabled); setNotice(enabled ? "Integrations enabled" : "Integrations disabled"); }
   }
 
+  async function saveGoogleSettings(event: React.FormEvent) {
+    event.preventDefault(); setGoogleBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/integrations/google", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadsheet: sheetUrl, worksheetTitle, syncEnabled: autoSync }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Could not save Google Sheets settings");
+      setGoogle(body.connection); setNotice("Google Sheets settings saved.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save Google Sheets settings"); }
+    finally { setGoogleBusy(false); }
+  }
+
+  async function syncGoogleNow() {
+    setGoogleBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/integrations/google", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Google Sheets sync failed");
+      setGoogle((current) => current ? { ...current, last_synced_at: new Date().toISOString(), last_error: null } : current);
+      setNotice(`Synced ${body.rows} contacts to Google Sheets.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Google Sheets sync failed"); }
+    finally { setGoogleBusy(false); }
+  }
+
+  async function disconnectGoogle() {
+    if (!window.confirm("Disconnect Google Sheets? Automatic sync will stop.")) return;
+    setGoogleBusy(true); setError("");
+    try {
+      const response = await fetch("/api/integrations/google", { method: "DELETE" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Could not disconnect Google Sheets");
+      setGoogle(null); setSheetUrl(""); setAutoSync(false); setNotice("Google Sheets disconnected.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not disconnect Google Sheets"); }
+    finally { setGoogleBusy(false); }
+  }
+
   return <Page wide section="Account" title="Integrations" subtitle="Tracked WhatsApp links and exports">
     <div className="grid gap-5 lg:grid-cols-2">
       {role === "admin" && <Panel title="Click-to-chat links" icon="link" meta={<Status tone={moduleEnabled ? "success" : "neutral"}>{moduleEnabled ? "Live" : "Off"}</Status>}>
@@ -92,12 +169,30 @@ export function IntegrationsManager() {
         <ul className="divide-y divide-line text-sm">
           <li className="flex justify-between gap-3 p-4"><span><strong>CSV export</strong><span className="block text-xs text-ink-faint">Contacts and Reports can be opened in spreadsheet apps.</span></span><Status tone="success">Live</Status></li>
           <li className="flex justify-between gap-3 p-4"><span><strong>Shopify sync</strong><span className="block text-xs text-ink-faint">Needs a Shopify OAuth app and app review.</span></span><Status>Later</Status></li>
-          <li className="flex justify-between gap-3 p-4"><span><strong>Live Google Sheets sync</strong><span className="block text-xs text-ink-faint">Needs Google OAuth consent and an external app review.</span></span><Status>Later</Status></li>
+          <li className="flex justify-between gap-3 p-4"><span><strong>Google Sheets sync</strong><span className="block text-xs text-ink-faint">Sync this business’s contacts to its own spreadsheet.</span></span><Status tone={google ? "success" : "neutral"}>{google ? "Connected" : "Available"}</Status></li>
         </ul>
         <div className="border-t border-line p-4"><a className="text-sm font-semibold text-accent underline" href="/api/reports?format=csv">Export today’s report CSV</a></div>
+        <div className="border-t border-line p-4 space-y-3">
+          {role !== "admin" ? <p className="text-xs text-ink-faint">A business admin can connect and configure Google Sheets.</p> : !moduleEnabled ? <p className="text-xs text-ink-faint">Enable the Integrations module to connect Google Sheets.</p> : (
+            <>
+              {!google ? <div><a href="/api/integrations/google/connect" aria-disabled={!googleConfigured} className={`inline-flex rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white ${googleConfigured ? "" : "pointer-events-none opacity-50"}`}>Connect Google account</a>{!googleConfigured && <p className="mt-2 text-xs text-attention">Google OAuth credentials and token encryption key must be configured by the app administrator.</p>}</div> : <>
+                <p className="text-xs text-ink-soft">Connected{google.google_email ? ` as ${google.google_email}` : ""}. ChatFlow syncs contacts into the tab below.</p>
+                <form onSubmit={saveGoogleSettings} className="space-y-3">
+                  <label className="block text-xs font-semibold">Google spreadsheet URL or ID<input required className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2" value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/..." /></label>
+                  <label className="block text-xs font-semibold">Tab name<input required maxLength={100} className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2" value={worksheetTitle} onChange={(e) => setWorksheetTitle(e.target.value)} /></label>
+                  <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} className="mt-0.5" /><span>Automatically sync about every 5 minutes. ChatFlow owns and replaces the contents of this tab.</span></label>
+                  <div className="flex flex-wrap gap-2"><Button type="submit" variant="secondary" disabled={googleBusy}>{googleBusy ? "Saving…" : "Save sheet settings"}</Button><Button type="button" onClick={() => void syncGoogleNow()} disabled={googleBusy || !google.spreadsheet_id}>{googleBusy ? "Syncing…" : "Sync now"}</Button><Button type="button" variant="danger" onClick={() => void disconnectGoogle()} disabled={googleBusy}>Disconnect</Button></div>
+                </form>
+                {google.last_synced_at && <p className="text-[11px] text-ink-faint">Last sync: {new Date(google.last_synced_at).toLocaleString()}</p>}
+                {google.last_error && <p className="text-xs text-danger" role="alert">Last sync failed: {google.last_error}</p>}
+              </>}
+              <p className="text-[11px] text-ink-faint">This is one-way contact export from ChatFlow to Sheets; editing the sheet does not change ChatFlow. You can use separate spreadsheets per business.</p>
+            </>
+          )}
+        </div>
       </Panel>
     </div>
-    {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}{notice && <p role="status" className="mt-4 text-sm text-ink-soft">{notice}</p>}
+    {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}{(googleNotice || notice) && <p role="status" className="mt-4 text-sm text-ink-soft">{googleNotice || notice}</p>}
     {demo && <p className="mt-4 text-xs text-ink-faint">Sample mode: connect a WhatsApp business number to create live links.</p>}
   </Page>;
 }
