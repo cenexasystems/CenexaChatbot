@@ -28,6 +28,7 @@ type Ctx = {
   t: (k: StringKey) => string;
   refresh: () => Promise<void>;
   loadMessages: (id: string) => Promise<void>;
+  retryTranscription: (id: string, messageId: string) => Promise<void>;
   loadOlderMessages: (id: string) => Promise<boolean>;
   sendText: (id: string, text: string) => Promise<void>;
   sendImage: (id: string, file: File, caption: string) => Promise<void>;
@@ -175,6 +176,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     });
     setMessagePages((current) => ({ ...current, [id]: { hasMore: Boolean(data.hasMore), cursor: data.nextCursor ?? null } }));
   }, []);
+
+  const retryTranscription = useCallback(async (id: string, messageId: string) => {
+    const response = await fetch(`/api/conversations/${id}/messages/${messageId}/transcribe`, { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? "Could not transcribe voice note");
+    await loadMessages(id);
+  }, [loadMessages]);
 
   const loadOlderMessages = useCallback(async (id: string): Promise<boolean> => {
     if (DEMO_MODE) return false;
@@ -434,6 +442,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     t,
     refresh,
     loadMessages,
+    retryTranscription,
     loadOlderMessages,
     sendText,
     sendImage,

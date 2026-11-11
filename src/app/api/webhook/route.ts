@@ -478,14 +478,11 @@ async function handleIncoming(value: any, message: any) {
   }
 
   /* ── should the AI answer at all? ──
-     "human" = manual dashboard toggle.
-     ai_paused_until = owner replied from WhatsApp Business app (ONLY checked when coexistence_enabled = true). */
-  if (conversation.mode === "human") return;
-
-  if (isCoexistenceEnabled) {
-    const paused = conversation.ai_paused_until && new Date(conversation.ai_paused_until) > new Date();
-    if (paused) return;
-  }
+     Manual/paused chats still need media transcription and image analysis so
+     the team can understand what was sent; they must not receive an AI reply. */
+  const aiPaused = isCoexistenceEnabled && conversation.ai_paused_until && new Date(conversation.ai_paused_until) > new Date();
+  const suppressAiReply = conversation.mode === "human" || Boolean(aiPaused);
+  if (suppressAiReply && !(isMediaAiEnabled && (msgType === "audio" || msgType === "image"))) return;
 
   /* ══════════════════════════════════════════════════════════════
      LEGACY PATH: media_ai_enabled === false
@@ -627,6 +624,9 @@ async function handleIncoming(value: any, message: any) {
   if (msgType === "audio" && !analysed) needsHuman = true;
   if (msgType === "image" && !analysed && paymentWasRequested) await markPaymentScreenshot();
   if (msgType === "image" && !analysed && !isPaymentScreenshot) needsHuman = true;
+
+  // Store analysis in manual/paused chats, but leave replies and handoff state to the team.
+  if (suppressAiReply) return;
 
   // Payment screenshots always go to the payment review queue. The model may
   // read visible fields, but only a person checks the bank/UPI account.
