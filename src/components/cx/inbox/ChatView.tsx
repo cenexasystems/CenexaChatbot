@@ -13,7 +13,7 @@ import { templateVariableCount } from "@/lib/templates";
 type Toast = { msg: string; tone: "ok" | "error" } | null;
 
 export function ChatView({ id }: { id: string }) {
-  const { conversations, messages, messagePages, loadMessages, loadOlderMessages, now, changeMode, sendText, sendImage, verifyPayment, deleteMessage, business, demo, role } = useDashboard();
+  const { conversations, messages, messagePages, loadMessages, loadOlderMessages, retryTranscription, now, changeMode, sendText, sendImage, verifyPayment, deleteMessage, business, demo, role } = useDashboard();
   const canReply = !business?.strict_roles || ["admin", "support", "sales"].includes(role);
   const canVerifyPayment = !business?.strict_roles || ["admin", "accounts"].includes(role);
   const params = useSearchParams();
@@ -26,6 +26,7 @@ export function ChatView({ id }: { id: string }) {
   const [image, setImage] = useState<{ file: File; preview: string } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
+  const [transcribingId, setTranscribingId] = useState<string | null>(null);
   const [modeBusy, setModeBusy] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -188,6 +189,19 @@ export function ChatView({ id }: { id: string }) {
     await deleteMessage(id, msgId);
   }
 
+  async function handleRetryTranscription(msgId: string) {
+    if (transcribingId) return;
+    setTranscribingId(msgId);
+    try {
+      await retryTranscription(id, msgId);
+      showToast("Voice note transcribed.");
+    } catch (e) {
+      showToast((e as Error).message || "Could not transcribe voice note.", "error");
+    } finally {
+      setTranscribingId(null);
+    }
+  }
+
   async function setMode(mode: "agent" | "human") {
     if (modeBusy) return;
     setModeBusy(true);
@@ -266,6 +280,8 @@ export function ChatView({ id }: { id: string }) {
                       onConfirmPayment={() => handlePayment("verified")}
                       onRejectPayment={() => handlePayment("rejected")}
                       onDelete={() => handleDelete(m.id)}
+                      onRetryTranscription={!demo && canReply && m.media_type === "audio" && !m.transcript ? () => void handleRetryTranscription(m.id) : undefined}
+                      transcribing={transcribingId === m.id}
                       canDelete={canReply}
                       canVerifyPayment={canVerifyPayment}
                     />

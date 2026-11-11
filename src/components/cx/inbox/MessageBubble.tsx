@@ -27,6 +27,8 @@ export function MessageBubble({
   busy,
   canDelete = true,
   canVerifyPayment = true,
+  onRetryTranscription,
+  transcribing = false,
 }: {
   msg: Message;
   paymentPending: boolean;
@@ -36,6 +38,8 @@ export function MessageBubble({
   busy: boolean;
   canDelete?: boolean;
   canVerifyPayment?: boolean;
+  onRetryTranscription?: () => void;
+  transcribing?: boolean;
 }) {
   const sender = senderOf(msg);
   const inbound = sender === "customer";
@@ -78,7 +82,7 @@ export function MessageBubble({
           )}
         </div>
         <div className={cx("rounded-[12px] px-3 py-2 text-[14px] leading-relaxed", BUBBLE[sender], inbound ? "rounded-tl-[3px]" : "rounded-tr-[3px]", pending && "opacity-60")}>
-          <Content msg={msg} analysis={analysis} dark={sender === "team"} />
+          <Content msg={msg} analysis={analysis} dark={sender === "team"} onRetryTranscription={onRetryTranscription} transcribing={transcribing} />
         </div>
         {msg.is_payment_screenshot && (
           <PaymentCard
@@ -96,7 +100,7 @@ export function MessageBubble({
   );
 }
 
-function Content({ msg, analysis, dark }: { msg: Message; analysis: (VoiceInfo & ImageInfo) | null; dark: boolean }) {
+function Content({ msg, analysis, dark, onRetryTranscription, transcribing }: { msg: Message; analysis: (VoiceInfo & ImageInfo) | null; dark: boolean; onRetryTranscription?: () => void; transcribing: boolean }) {
   const caption = msg.content && !/^\[(image|audio|document|video|sticker)\]$/.test(msg.content) ? msg.content : null;
   const subtle = dark ? "text-white/60" : "text-ink-faint";
 
@@ -128,7 +132,10 @@ function Content({ msg, analysis, dark }: { msg: Message; analysis: (VoiceInfo &
         {msg.transcript ? (
           <p className="whitespace-pre-wrap">{msg.transcript}</p>
         ) : (
-          <p className={cx("text-[12px]", subtle)}>No transcript available.</p>
+          <div className="space-y-1.5">
+            <p className={cx("text-[12px]", subtle)}>No transcript available.</p>
+            {onRetryTranscription && <button type="button" onClick={onRetryTranscription} disabled={transcribing} className="text-[11px] font-semibold text-accent underline underline-offset-2 disabled:opacity-50">{transcribing ? "Transcribing…" : "Retry transcription"}</button>}
+          </div>
         )}
         {analysis?.summary && (
           <div className={cx("border-t pt-2", dark ? "border-white/15" : "border-line")}>
