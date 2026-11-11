@@ -77,7 +77,7 @@ export async function POST(
       const providerStatus = result.providerStatus;
       const providerCode = result.providerCode?.toLowerCase();
       if (providerStatus === 401 || providerCode === "invalid_api_key") {
-        return Response.json({ error: "OpenAI rejected TRANSCRIBE_API_KEY. Check that it is a valid OpenAI API key saved for this Vercel environment, then redeploy." }, { status: 502 });
+        return Response.json({ error: `${result.provider ?? "Transcription provider"} rejected the API key. Check that the key matches the provider configured for transcription.` }, { status: 502 });
       }
       if (providerStatus === 429 || providerCode === "insufficient_quota") {
         return Response.json({ error: "OpenAI rejected transcription because of a quota or rate limit. Check API billing, credits, and usage limits for the key’s project." }, { status: 502 });

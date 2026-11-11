@@ -64,7 +64,7 @@ export interface ImageAnalysis {
 
 export type VoiceResult =
   | { ok: true; analysis: VoiceAnalysis }
-  | { ok: false; reason: "not_configured" | "too_large" | "empty" | "failed"; providerStatus?: number; providerCode?: string };
+  | { ok: false; reason: "not_configured" | "too_large" | "empty" | "failed"; provider?: "OpenAI" | "OpenRouter"; providerStatus?: number; providerCode?: string };
 
 export type ImageResult =
   | { ok: true; analysis: ImageAnalysis }
@@ -139,14 +139,19 @@ async function transcribe(buffer: Buffer, mime: string): Promise<string | null> 
   const apiKey = process.env.TRANSCRIBE_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
+  const usesOpenRouter = apiKey.startsWith("sk-or-");
+  const configuredModel = process.env.TRANSCRIBE_MODEL;
+  const model = usesOpenRouter
+    ? configuredModel?.includes("/") ? configuredModel : `openai/${configuredModel ?? "gpt-4o-transcribe"}`
+    : configuredModel ?? "gpt-4o-transcribe";
   const client = new OpenAI({
     apiKey,
-    baseURL: process.env.TRANSCRIBE_BASE_URL ?? "https://api.openai.com/v1",
+    baseURL: usesOpenRouter ? "https://openrouter.ai/api/v1" : process.env.TRANSCRIBE_BASE_URL ?? "https://api.openai.com/v1",
   });
   const file = await toFile(buffer, `voice.${audioExt(mime)}`, { type: mime });
   const res = await client.audio.transcriptions.create({
     file,
-    model: process.env.TRANSCRIBE_MODEL ?? "gpt-4o-transcribe",
+    model,
     ...(process.env.TRANSCRIBE_LANGUAGE ? { language: process.env.TRANSCRIBE_LANGUAGE } : {}),
   });
   return res.text?.trim() || null;
@@ -178,11 +183,14 @@ export async function analyzeVoiceNote(
   try {
     transcript = await transcribe(buffer, mimeType);
   } catch (err) {
+    const apiKey = process.env.TRANSCRIBE_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
+    const baseUrl = process.env.TRANSCRIBE_BASE_URL ?? (apiKey.startsWith("sk-or-") ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1");
+    const provider = apiKey.startsWith("sk-or-") || baseUrl.includes("openrouter.ai") ? "OpenRouter" : "OpenAI";
     const providerError = err as { status?: unknown; code?: unknown; message?: unknown };
     const providerStatus = typeof providerError.status === "number" ? providerError.status : undefined;
     const providerCode = typeof providerError.code === "string" ? providerError.code : undefined;
-    console.error("[media-ai] transcription failed:", { status: providerStatus, code: providerCode, message: providerError.message });
-    return { ok: false, reason: "failed", providerStatus, providerCode };
+    console.error("[media-ai] transcription failed:", { provider, status: providerStatus, code: providerCode, message: providerError.message });
+    return { ok: false, reason: "failed", provider, providerStatus, providerCode };
   }
   // Speech models sometimes emit a stray word for silence/noise.
   if (!transcript || transcript.replace(/[^\p{L}\p{N}]/gu, "").length < 2) {
