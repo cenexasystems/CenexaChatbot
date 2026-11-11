@@ -349,8 +349,18 @@ the browser generates the QR locally and the page provides a copyable website
 button snippet. The webhook records a source only when the first message
 contains an exact code owned by that business. Attribution is best effort
 because customers can edit the prefilled text. Contacts and Reports export
-UTF-8 CSV. Shopify and live Google Sheets sync remain Later; CSV export does
-not connect to a Google account.
+UTF-8 CSV. Google Sheets sync is one-way contacts export: the authorized
+business admin selects a spreadsheet and tab, tests with Sync now, and may
+enable a five-minute cron sync. ChatFlow owns and replaces that tab's contents;
+other tabs are not touched. Apply `20261112_google_sheets_sync.sql` after the
+integrations migration. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_SHEETS_REDIRECT_URI` (exactly the deployed `/api/integrations/google/callback`
+URL), and a randomly generated base64 32-byte
+`GOOGLE_SHEETS_TOKEN_ENCRYPTION_KEY`. Add the callback URL to the Google OAuth
+client, enable the Google Sheets API, configure the OAuth consent screen, and
+complete Google's verification/publishing requirements before serving external
+customers. The Vercel cron runs every five minutes and processes up to five
+connected businesses per invocation. Shopify remains Later.
 
 ## Platform track: Cenexa administration
 
